@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIGIL — open-channel encryption</title>
+<style>
+  :root {
+    --bg: #12110f;
+    --ink: #e8dcc4;
+    --muted: #8a7d64;
+    --accent: #d4a017;
+    --accent-dim: #7a5a10;
+    --panel: #1c1a16;
+    --line: #3a3428;
+    --ok: #7dba6a;
+    --bad: #d36c5c;
+    --mono: "IBM Plex Mono", "ui-monospace", "Cascadia Mono", monospace;
+    --sans: "Source Serif 4", "Palatino Linotype", Palatino, serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font-family: var(--sans);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse at top, #2a2418 0%, transparent 50%),
+      repeating-linear-gradient(0deg, transparent, transparent 19px, #1a1814 20px);
+  }
+  header {
+    padding: 2.2rem 1.4rem 1rem;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-weight: 600;
+    letter-spacing: 0.28em;
+    font-size: 1.35rem;
+    margin: 0 0 0.35rem;
+    color: var(--accent);
+  }
+  .tag {
+    color: var(--muted);
+    font-size: 0.95rem;
+    margin: 0;
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto 4rem;
+    padding: 0 1.4rem;
+  }
+  .tabs { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 1.2rem 0; }
+  .tabs button {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    padding: 0.4rem 0.8rem;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .tabs button.on { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+  section.panel {
+    display: none;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 1.1rem 1.1rem 1.3rem;
+  }
+  section.panel.on { display: block; }
+  label { display: block; font-size: 0.8rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin: 0.7rem 0 0.25rem; }
+  input, textarea, select {
+    width: 100%;
+    background: #0e0d0b;
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 0.55rem 0.65rem;
+    font-family: var(--mono);
+    font-size: 0.92rem;
+  }
+  textarea { min-height: 7.5rem; resize: vertical; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+  @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+  button.go {
+    margin-top: 0.9rem;
+    background: var(--accent);
+    color: #16130c;
+    border: 0;
+    padding: 0.55rem 1rem;
+    font-family: var(--mono);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  button.go.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent-dim); }
+  .out {
+    margin-top: 0.9rem;
+    background: #0e0d0b;
+    border: 1px dashed var(--accent-dim);
+    padding: 0.75rem;
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+    min-height: 3rem;
+  }
+  .ok { color: var(--ok); }
+  .bad { color: var(--bad); }
+  .hint { color: var(--muted); font-size: 0.88rem; margin-top: 0.6rem; line-height: 1.45; }
+  footer {
+    max-width: 860px; margin: 0 auto; padding: 0 1.4rem 3rem;
+    color: var(--muted); font-size: 0.82rem; line-height: 1.5;
+  }
+  kbd { font-family: var(--mono); color: var(--accent); }
+  .list { font-family: var(--mono); font-size: 0.85rem; }
+  .list div { padding: 0.25rem 0; border-bottom: 1px solid #2a261e; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SIGIL</h1>
+  <p class="tag">Sealed messages for open chats and Minecraft whispers. Everything stays in this browser.</p>
+</header>
+<main>
+  <div class="tabs">
+    <button class="on" data-tab="seal">Seal</button>
+    <button data-tab="open">Open</button>
+    <button data-tab="circle">Circle</button>
+    <button data-tab="signet">Signet</button>
+    <button data-tab="about">Spec</button>
+  </div>
+
+  <section class="panel on" id="seal">
+    <div class="row">
+      <div>
+        <label>Mode</label>
+        <select id="seal-mode">
+          <option value="C">Circle (shared passphrase)</option>
+          <option value="K">Signet (to a contact)</option>
+          <option value="E">Ephemeral (forward secrecy)</option>
+        </select>
+      </div>
+      <div>
+        <label>Target</label>
+        <input id="seal-target" placeholder="circle name or contact alias">
+      </div>
+    </div>
+    <label>Plaintext</label>
+    <textarea id="seal-text" placeholder="meet at the ruined portal after nightfall"></textarea>
+    <button class="go" id="seal-btn">Seal into chat line</button>
+    <button class="go ghost" id="copy-seal">Copy</button>
+    <div class="out" id="seal-out"></div>
+    <p class="hint">Minecraft public chat and whispers cap a line at 256 characters. Long messages split into <kbd>i/n</kbd> fragments. Paste each fragment as its own chat line.</p>
+  </section>
+
+  <section class="panel" id="open">
+    <label>Ciphertext from chat</label>
+    <textarea id="open-text" placeholder="S1C.deep.v3k1..."></textarea>
+    <button class="go" id="open-btn">Open</button>
+    <div class="out" id="open-out"></div>
+  </section>
+
+  <section class="panel" id="circle">
+    <div class="row">
+      <div>
+        <label>Circle name</label>
+        <input id="c-name" placeholder="deepcave">
+      </div>
+      <div>
+        <label>Passphrase (voice / paper only)</label>
+        <input id="c-pass" type="password" placeholder="at least 8 characters">
+      </div>
+    </div>
+    <button class="go" id="c-save">Save circle on this device</button>
+    <div class="out" id="c-out"></div>
+    <p class="hint">A circle is a named shared secret. Announce the name in public chat if you want; the passphrase never goes in chat. Same name + passphrase on two devices produces the same key.</p>
+    <label>Saved circles</label>
+    <div class="list" id="c-list"></div>
+  </section>
+
+  <section class="panel" id="signet">
+    <div class="row">
+      <div>
+        <label>Your alias</label>
+        <input id="s-name" placeholder="Steve">
+      </div>
+      <div>
+        <label>Contact alias</label>
+        <input id="ct-name" placeholder="Alex">
+      </div>
+    </div>
+    <button class="go" id="s-new">Forge a new signet</button>
+    <button class="go ghost" id="s-pub">Show my public announcement</button>
+    <label>Paste someone else's S1+PK announcement</label>
+    <input id="ct-ann" placeholder="S1+PK.Alex.k9wq....">
+    <button class="go ghost" id="ct-add">Remember contact</button>
+    <div class="out" id="s-out"></div>
+    <label>Local signets / contacts</label>
+    <div class="list" id="s-list"></div>
+  </section>
+
+  <section class="panel" id="about">
+    <p class="hint">
+      SIGIL is a public algorithm. Security lives in the keys, not in hiding how it works.
+      <br><br>
+      <kbd>S1C.slug.payload</kbd> — AES-256-GCM under a PBKDF2-SHA256 circle key (210000 iterations).<br>
+      <kbd>S1K.to.from.payload</kbd> — P-256 ECDH + HKDF-SHA256 + AES-256-GCM.<br>
+      <kbd>S1E.to.payload</kbd> — ephemeral P-256 sender key, then the same seal.<br>
+      Payload is <kbd>nonce || ciphertext || tag</kbd> in unpadded URL-safe base64.
+      <br><br>
+      AAD binds the circle or the direction so a valid token cannot be silently retargeted.
+      Observers learn that a sealed message exists and which slug or short-id it is for.
+      They do not learn the plaintext and cannot forge a token without the key.
+      <br><br>
+      Not a Minecraft mod. Not anonymous. Not post-quantum. Meant for channels you do not control.
+    </p>
+  </section>
+</main>
+<footer>
+  Protocol S1 · keys live in this browser's localStorage · no network requests after the page loads.
+</footer>
+<script>
+const PROTOCOL = "SIGIL.v1";
+const ITERS = 210000;
+const VERSION = "S1";
+
+const $ = (id) => document.getElementById(id);
+
+function b64e(buf) {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+function b64d(text) {
+  text = text.replace(/-/g, "+").replace(/_/g, "/");
+  while (text.length % 4) text += "=";
+  const bin = atob(text);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function slugify(name, n = 4) {
+  const cleaned = name.toLowerCase().replace(/[^a-z0-9]/g, "") || "circ";
+  return (cleaned + "x".repeat(n)).slice(0, n);
+}
+async function sha256(bytes) {
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+}
+function shortId(bytes, n = 4) {
+  return b64e(bytes).slice(0, n).toLowerCase();
+}
+function enc(str) { return new TextEncoder().encode(str); }
+function dec(buf) { return new TextDecoder().decode(buf); }
+
+function store() {
+  const raw = localStorage.getItem("sigil.v1") || "{}";
+  try { return JSON.parse(raw); } catch { return {}; }
+}
+function persist(db) { localStorage.setItem("sigil.v1", JSON.stringify(db)); }
+
+async function circleKey(name, passphrase) {
+  const saltFull = await sha256(enc(PROTOCOL + ".circle.salt." + name));
+  const salt = saltFull.slice(0, 16);
+  const base = await crypto.subtle.importKey("raw", enc(passphrase), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", hash: "SHA-256", salt, iterations: ITERS },
+    base,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function fingerprintCircle(name, passphrase) {
+  const saltFull = await sha256(enc(PROTOCOL + ".circle.salt." + name));
+  const salt = saltFull.slice(0, 16);
+  const base = await crypto.subtle.importKey("raw", enc(passphrase), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt, iterations: ITERS },
+    base,
+    256
+  );
+  return shortId(await sha256(new Uint8Array(bits)));
+}
+
+function chunkText(text, byteBudget) {
+  const parts = [];
+  let cur = "";
+  const encOne = (s) => new TextEncoder().encode(s).length;
+  for (const ch of text) {
+    if (cur && encOne(cur + ch) > byteBudget) {
+      parts.push(cur);
+      cur = ch;
+    } else cur += ch;
+  }
+  if (cur) parts.push(cur);
+  return parts.length ? parts : [""];
+}
+
+async function sealCircle(name, passphrase, text) {
+  const key = await circleKey(name, passphrase);
+  const slug = slugify(name);
+  const budget = Math.max(24, Math.floor((256 - 12 - slug.length) * 3 / 4) - 12 - 16 - 8);
+  const parts = chunkText(text, budget);
+  const lines = [];
+  for (let i = 0; i < parts.length; i++) {
+    const nonce = crypto.getRandomValues(new Uint8Array(12));
+    const aad = enc(`${PROTOCOL}.C.${name}.${i + 1}/${parts.length}`);
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 }, key, enc(parts[i])));
+    const payload = new Uint8Array(nonce.length + ct.length);
+    payload.set(nonce, 0); payload.set(ct, nonce.length);
+    const blob = b64e(payload);
+    lines.push(parts.length === 1 ? `${VERSION}C.${slug}.${blob}` : `${VERSION}C.${slug}.${i + 1}/${parts.length}.${blob}`);
+  }
+  return lines;
+}
+
+async function openCircleLine(name, passphrase, blob, i, n) {
+  const key = await circleKey(name, passphrase);
+  const data = b64d(blob);
+  const nonce = data.slice(0, 12);
+  const ct = data.slice(12);
+  const aad = enc(`${PROTOCOL}.C.${name}.${i}/${n}`);
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 }, key, ct);
+  return dec(pt);
+}
+
+async function generateSignet(name) {
+  const kp = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const pkRaw = new Uint8Array(await crypto.subtle.exportKey("raw", kp.publicKey));
+  // raw P-256 is uncompressed 65 bytes. Compress it.
+  const compressed = compressP256(pkRaw);
+  const skJwk = await crypto.subtle.exportKey("jwk", kp.privateKey);
+  const pkJwk = await crypto.subtle.exportKey("jwk", kp.publicKey);
+  return {
+    name,
+    short: shortId(await sha256(compressed)),
+    pk: b64e(compressed),
+    skJwk, pkJwk
+  };
+}
+
+function compressP256(raw) {
+  if (raw.length === 33) return raw;
+  if (raw.length !== 65 || raw[0] !== 4) throw new Error("unexpected P-256 point");
+  const x = raw.slice(1, 33);
+  const y = raw.slice(33);
+  const prefix = (y[31] & 1) ? 3 : 2;
+  const out = new Uint8Array(33);
+  out[0] = prefix; out.set(x, 1);
+  return out;
+}
+
+async function importUncompressed(raw65) {
+  return crypto.subtle.importKey("raw", raw65, { name: "ECDH", namedCurve: "P-256" }, true, []);
+}
+
+// Expand compressed P-256 so WebCrypto can import it as 'raw'.
+// We use JWK storage for local keys to avoid this on our own signets.
+async function decompressViaJwk(contactJwk) {
+  return crypto.subtle.importKey("jwk", contactJwk, { name: "ECDH", namedCurve: "P-256" }, true, []);
+}
+
+function jwkFromCompressed(compressedB64) {
+  // We cannot cheaply decompress in JS without an EC library.
+  // Contacts store uncompressed JWK when added from a full announcement
+  // that includes JWK, but the compact S1+PK wire format is compressed.
+  // For interoperability with the Python CLI we keep compressed on the wire
+  // and also stash JWK locally when we generated the key ourselves.
+  return compressedB64;
+}
+
+async function ecdhAesKey(priv, pub, infoBytes) {
+  const bits = await crypto.subtle.deriveBits({ name: "ECDH", public: pub }, priv, 256);
+  const ikm = await crypto.subtle.importKey("raw", bits, "HKDF", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(), info: infoBytes },
+    ikm,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+function refreshLists() {
+  const db = store();
+  const circles = db.circles || {};
+  const cList = $("c-list");
+  cList.innerHTML = Object.keys(circles).length
+    ? Object.values(circles).map(c => `<div>${c.slug} · ${c.name} · fp ${c.fp}</div>`).join("")
+    : "<div>none yet</div>";
+  const sList = $("s-list");
+  const signets = db.signets || {};
+  const contacts = db.contacts || {};
+  const rows = [];
+  for (const s of Object.values(signets)) rows.push(`<div>me ${s.short} · ${s.name}</div>`);
+  const seen = new Set();
+  for (const c of Object.values(contacts)) {
+    if (seen.has(c.short)) continue;
+    seen.add(c.short);
+    rows.push(`<div>peer ${c.short} · ${c.alias}</div>`);
+  }
+  sList.innerHTML = rows.length ? rows.join("") : "<div>none yet</div>";
+}
+
+document.querySelectorAll(".tabs button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("on"));
+    document.querySelectorAll("section.panel").forEach(p => p.classList.remove("on"));
+    btn.classList.add("on");
+    $(btn.dataset.tab).classList.add("on");
+  });
+});
+
+$("c-save").onclick = async () => {
+  const name = $("c-name").value.trim();
+  const pass = $("c-pass").value;
+  if (!name || pass.length < 8) {
+    $("c-out").innerHTML = '<span class="bad">Need a name and a passphrase of 8+ characters.</span>';
+    return;
+  }
+  const fp = await fingerprintCircle(name, pass);
+  const db = store();
+  db.circles = db.circles || {};
+  db.circles[name.toLowerCase()] = { name, pass, slug: slugify(name), fp };
+  persist(db);
+  $("c-out").textContent = `S1+CIRCLE.${slugify(name)}.${name.replace(/\./g, "_")}.fp${fp}\n\nSaved locally. Share the passphrase out of band.`;
+  refreshLists();
+};
+
+$("s-new").onclick = async () => {
+  const name = $("s-name").value.trim() || "player";
+  const rec = await generateSignet(name);
+  const db = store();
+  db.signets = db.signets || {};
+  db.signets[name.toLowerCase()] = rec;
+  persist(db);
+  $("s-out").textContent = `S1+PK.${name.replace(/\./g, "_")}.${rec.short}.${rec.pk}`;
+  refreshLists();
+};
+
+$("s-pub").onclick = () => {
+  const db = store();
+  const signets = Object.values(db.signets || {});
+  if (!signets.length) { $("s-out").innerHTML = '<span class="bad">Forge a signet first.</span>'; return; }
+  $("s-out").textContent = signets.map(s => `S1+PK.${s.name.replace(/\./g, "_")}.${s.short}.${s.pk}`).join("\n");
+};
+
+$("ct-add").onclick = async () => {
+  const alias = $("ct-name").value.trim();
+  const ann = $("ct-ann").value.trim();
+  if (!alias || !ann.startsWith("S1+PK.")) {
+    $("s-out").innerHTML = '<span class="bad">Need an alias and an S1+PK announcement.</span>';
+    return;
+  }
+  const parts = ann.split(".");
+  if (parts.length < 4) { $("s-out").innerHTML = '<span class="bad">Malformed announcement.</span>'; return; }
+  const db = store();
+  db.contacts = db.contacts || {};
+  const entry = { alias, name: parts[1], short: parts[2], pk: parts[3] };
+  db.contacts[alias.toLowerCase()] = entry;
+  db.contacts[entry.short] = entry;
+  persist(db);
+  $("s-out").textContent = `Remembered ${alias} short=${entry.short}`;
+  refreshLists();
+};
+
+$("seal-btn").onclick = async () => {
+  const mode = $("seal-mode").value;
+  const target = $("seal-target").value.trim();
+  const text = $("seal-text").value;
+  const out = $("seal-out");
+  try {
+    if (!text) throw new Error("Type a message first.");
+    if (mode === "C") {
+      const db = store();
+      const rec = (db.circles || {})[target.toLowerCase()] || Object.values(db.circles || {}).find(c => c.slug === target || c.name.toLowerCase() === target.toLowerCase());
+      if (!rec) throw new Error("Unknown circle. Save it in the Circle tab.");
+      const lines = await sealCircle(rec.name, rec.pass, text);
+      out.textContent = lines.join("\n");
+      return;
+    }
+    throw new Error("Signet sealing in the browser talks JWK locally; use sigil.py to talk to CLI-made P-256 compressed keys for now. Circle mode is fully interopable.");
+  } catch (e) {
+    out.innerHTML = `<span class="bad">${e.message}</span>`;
+  }
+};
+
+$("copy-seal").onclick = async () => {
+  const t = $("seal-out").textContent.trim();
+  if (!t) return;
+  await navigator.clipboard.writeText(t);
+};
+
+$("open-btn").onclick = async () => {
+  const raw = $("open-text").value.trim();
+  const out = $("open-out");
+  const db = store();
+  const lines = raw.split(/\s+/).filter(t => t.startsWith("S1"));
+  if (!lines.length) { out.innerHTML = '<span class="bad">No S1 token found.</span>'; return; }
+  const msgs = [];
+  for (const line of lines) {
+    const parts = line.split(".");
+    const kind = parts[0].slice(2);
+    if (kind !== "C") { msgs.push("only circle tokens can be opened in this page right now: " + line.slice(0, 24)); continue; }
+    let slug = parts[1];
+    let blob = parts[parts.length - 1];
+    let i = 1, n = 1;
+    if (parts.length >= 4 && parts[2].includes("/")) {
+      const [a, b] = parts[2].split("/");
+      i = +a; n = +b;
+    }
+    const rec = Object.values(db.circles || {}).find(c => c.slug === slug || c.name.toLowerCase() === slug);
+    if (!rec) { msgs.push(`no local circle for slug ${slug}`); continue; }
+    try {
+      const pt = await openCircleLine(rec.name, rec.pass, blob, i, n);
+      msgs.push(`[circle ${rec.name} ${i}/${n}]\n${pt}`);
+    } catch (e) {
+      msgs.push(`failed ${slug}: ${e.message}`);
+    }
+  }
+  out.textContent = msgs.join("\n\n");
+};
+
+refreshLists();
+</script>
+</body>
+</html>

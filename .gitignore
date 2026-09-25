@@ -1,0 +1,31 @@
+# Never commit a keyring. Circles store passphrases in plaintext JSON.
+keys/
+*.key
+*.pem
+
+# Local overrides
+.env
+.sigil-home/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.envrc
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Test leftovers
+*.tmp
+/tmp-sigil-*/

@@ -1,0 +1,16 @@
+[project]
+name = "sigil-chat"
+version = "0.1.0"
+description = "Public-algorithm encryption for open chats and Minecraft whispers"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dependencies = [
+  "cryptography>=41.0.0",
+]
+
+[project.scripts]
+sigil = "sigil:main"
+
+[tool.setuptools]
+py-modules = ["sigil"]
