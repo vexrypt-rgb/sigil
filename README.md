@@ -22,9 +22,11 @@ export SIGIL_HOME="$PWD/.sigil-home"
 python3 sigil.py selftest
 ```
 
-Replace `<you>/sigil` with your empty GitHub or GitLab repo. Keep
-keyrings out of git: set `SIGIL_HOME` and never add `keys/` or
-`.sigil-home/`. Details are in `CONTRIBUTING.md`.
+Repo: https://github.com/vexrypt-rgb/sigil
+
+Windows: run `sigil.cmd` from this folder. Keys go to
+`%USERPROFILE%\.sigil`. Double-click `sigil.bundle.html` to seal
+without Python. Never commit a keyring.
 
 This is not a Minecraft mod. You generate a token on your machine (CLI or
 the single-file browser tool) and paste it into chat. The other person
@@ -125,6 +127,29 @@ Approximate UTF-8 byte budgets:
 
 English sits near 1 byte/char. A coordinate drop, a stash warning, a
 short plan — one line. A paragraph — two or three fragments.
+
+## Codebook compression (`--compact`)
+
+Ciphertext cannot be dictionary-compressed: it already looks like
+random bytes. Compression runs on **plaintext**, then AES-GCM seals
+the packed bytes. Tokens that used the codebook carry a public `.z.`
+flag so the opener knows to expand.
+
+```
+python3 sigil.py compact "nether roof stash at 0 128 0"
+python3 sigil.py seal -c deepcave "nether roof stash at 0 128 0"
+# S1C.deep.z....   (codebook is on by default; --raw skips it)
+```
+
+v2 uses a 4096-entry frequency-ranked lexicon (`lexicon_v2.txt`):
+Minecraft registry names and display names, multi-word phrases
+(`nether roof`, `eye of ender`, `ruined portal`), and short operational
+English. It is not a copy of any copyrighted aviation textbook.
+Coords and counts are zigzag integers. The stream is bit-packed.
+
+Typical stash chat lands around 20–40% of the original UTF-8 size
+before the GCM wrapper. Dictionary words come back lowercase. v1
+payloads still open; new seals emit v2.
 
 ## Cryptography, stated plainly
 

@@ -34,11 +34,9 @@ reports. SIGIL is what you paste *inside* those channels.
 python3 sigil.py seal -c deepcave "portal 1847 12 -320. after dragon."
 ```
 
-You get one line, usually well under 256 characters:
-
-```
-S1C.deep.XHbl-s6htesjjC3ejOD_NvQ4D3VHuCEnBNdvDSYcYqdJu0YebAm1D9T6lXPeTdyyvJ2Aixfm4yC_yetq9UQO
-```
+Compression is on by default, so the line is a `.z.` token, usually
+well under 256 characters. Use `--raw` only if the other person cannot
+expand codebook v2.
 
 Paste it in public chat, or:
 

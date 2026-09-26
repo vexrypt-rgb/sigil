@@ -3,11 +3,14 @@
 ## Repo layout
 
 ```
-sigil.py        reference implementation + CLI
-sigil.html      zero-install browser sealer (circle mode interops with CLI)
-README.md       protocol spec
-MINECRAFT.md    in-game playbook
-pyproject.toml  installable package metadata
+sigil.py           reference implementation + CLI
+sigil.cmd          Windows launcher
+sigil.html         browser sealer (needs lexicon_v2.js + codebook_v2.js)
+sigil.bundle.html  same tool as one file — ship this
+codebook.py        codebook v1 decode + v2 encode/decode
+lexicon_v2.txt     frozen 4096-entry public word list
+README.md          protocol spec
+MINECRAFT.md       in-game playbook
 ```
 
 The protocol lives in `README.md`. Change the wire format only with a

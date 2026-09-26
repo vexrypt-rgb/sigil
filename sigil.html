@@ -149,6 +149,7 @@
     </div>
     <label>Plaintext</label>
     <textarea id="seal-text" placeholder="meet at the ruined portal after nightfall"></textarea>
+    <label><input type="checkbox" id="seal-compact" checked> Compact (Minecraft + ops codebook v2)</label>
     <button class="go" id="seal-btn">Seal into chat line</button>
     <button class="go ghost" id="copy-seal">Copy</button>
     <div class="out" id="seal-out"></div>
@@ -216,10 +217,13 @@
       <br><br>
       Not a Minecraft mod. Not anonymous. Not post-quantum. Meant for channels you do not control.
     </p>
+    <button class="go ghost" id="selftest-btn">Run selftest in this browser</button>
+    <div class="out" id="selftest-out"></div>
   </section>
 </main>
 <footer>
   Protocol S1 · keys live in this browser's localStorage · no network requests after the page loads.
+  <span id="lex-hash"></span>
 </footer>
 <script>
 const PROTOCOL = "SIGIL.v1";
@@ -300,31 +304,42 @@ function chunkText(text, byteBudget) {
   return parts.length ? parts : [""];
 }
 
-async function sealCircle(name, passphrase, text) {
+async function sealCircle(name, passphrase, text, compact) {
   const key = await circleKey(name, passphrase);
   const slug = slugify(name);
-  const budget = Math.max(24, Math.floor((256 - 12 - slug.length) * 3 / 4) - 12 - 16 - 8);
+  const header = 12 + slug.length + (compact ? 2 : 0);
+  const budget = Math.max(24, Math.floor((256 - header) * 3 / 4) - 12 - 16 - 8);
   const parts = chunkText(text, budget);
   const lines = [];
   for (let i = 0; i < parts.length; i++) {
+    let body = enc(parts[i]);
+    let usedZ = false;
+    if (compact && window.SIGIL_CODEBOOK) {
+      const packed = SIGIL_CODEBOOK.maybeCompress(parts[i]);
+      body = packed.bytes;
+      usedZ = packed.used;
+    }
     const nonce = crypto.getRandomValues(new Uint8Array(12));
-    const aad = enc(`${PROTOCOL}.C.${name}.${i + 1}/${parts.length}`);
-    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 }, key, enc(parts[i])));
+    const z = usedZ ? ".z" : "";
+    const aad = enc(`${PROTOCOL}.C.${name}${z}.${i + 1}/${parts.length}`);
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 }, key, body));
     const payload = new Uint8Array(nonce.length + ct.length);
     payload.set(nonce, 0); payload.set(ct, nonce.length);
     const blob = b64e(payload);
-    lines.push(parts.length === 1 ? `${VERSION}C.${slug}.${blob}` : `${VERSION}C.${slug}.${i + 1}/${parts.length}.${blob}`);
+    lines.push(parts.length === 1 ? `${VERSION}C.${slug}${z}.${blob}` : `${VERSION}C.${slug}${z}.${i + 1}/${parts.length}.${blob}`);
   }
   return lines;
 }
 
-async function openCircleLine(name, passphrase, blob, i, n) {
+async function openCircleLine(name, passphrase, blob, i, n, compact) {
   const key = await circleKey(name, passphrase);
   const data = b64d(blob);
   const nonce = data.slice(0, 12);
   const ct = data.slice(12);
-  const aad = enc(`${PROTOCOL}.C.${name}.${i}/${n}`);
-  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 }, key, ct);
+  const z = compact ? ".z" : "";
+  const aad = enc(`${PROTOCOL}.C.${name}${z}.${i}/${n}`);
+  const pt = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 }, key, ct));
+  if (compact && window.SIGIL_CODEBOOK) return SIGIL_CODEBOOK.maybeExpand(pt);
   return dec(pt);
 }
 
@@ -377,12 +392,106 @@ async function ecdhAesKey(priv, pub, infoBytes) {
   const bits = await crypto.subtle.deriveBits({ name: "ECDH", public: pub }, priv, 256);
   const ikm = await crypto.subtle.importKey("raw", bits, "HKDF", false, ["deriveKey"]);
   return crypto.subtle.deriveKey(
-    { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(), info: infoBytes },
+    { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(32), info: infoBytes },
     ikm,
     { name: "AES-GCM", length: 256 },
     false,
     ["encrypt", "decrypt"]
   );
+}
+
+async function importLocalPriv(signet) {
+  return crypto.subtle.importKey("jwk", signet.skJwk, { name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+}
+
+async function sealToContact(local, contact, text, ephemeral, compact) {
+  if (!window.SIGIL_P256) throw new Error("p256.js not loaded");
+  const theirComp = b64d(contact.pk);
+  const theirPub = await SIGIL_P256.importCompressed(theirComp);
+  const localPubBytes = b64d(local.pk);
+  const parts = chunkText(text, 120);
+  const lines = [];
+  for (let i = 0; i < parts.length; i++) {
+    let body = enc(parts[i]);
+    let usedZ = false;
+    if (compact && window.SIGIL_CODEBOOK) {
+      const packed = SIGIL_CODEBOOK.maybeCompress(parts[i]);
+      body = packed.bytes; usedZ = packed.used;
+    }
+    const z = usedZ ? ".z" : "";
+    const nonce = crypto.getRandomValues(new Uint8Array(12));
+    if (ephemeral) {
+      const eph = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+      const ephRaw = new Uint8Array(await crypto.subtle.exportKey("raw", eph.publicKey));
+      const ephComp = SIGIL_P256.compress(ephRaw);
+      const info = enc(`${PROTOCOL}.E.${contact.short}${z}.${i + 1}/${parts.length}`);
+      const key = await ecdhAesKey(eph.privateKey, theirPub, info);
+      const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: info, tagLength: 128 }, key, body));
+      const payload = new Uint8Array(ephComp.length + nonce.length + ct.length);
+      payload.set(ephComp, 0); payload.set(nonce, ephComp.length); payload.set(ct, ephComp.length + nonce.length);
+      const blob = b64e(payload);
+      lines.push(parts.length === 1 ? `${VERSION}E.${contact.short}${z}.${blob}` : `${VERSION}E.${contact.short}${z}.${i + 1}/${parts.length}.${blob}`);
+    } else {
+      const priv = await importLocalPriv(local);
+      const infoCore = `${PROTOCOL}.K.${local.short}.${contact.short}${z}.${i + 1}/${parts.length}`;
+      const info = enc(infoCore);
+      const extra = new Uint8Array(info.length + localPubBytes.length + theirComp.length);
+      extra.set(info, 0); extra.set(localPubBytes, info.length); extra.set(theirComp, info.length + localPubBytes.length);
+      const key = await ecdhAesKey(priv, theirPub, extra);
+      const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: info, tagLength: 128 }, key, body));
+      const payload = new Uint8Array(nonce.length + ct.length);
+      payload.set(nonce, 0); payload.set(ct, nonce.length);
+      const blob = b64e(payload);
+      lines.push(parts.length === 1 ? `${VERSION}K.${contact.short}.${local.short}${z}.${blob}` : `${VERSION}K.${contact.short}.${local.short}${z}.${i + 1}/${parts.length}.${blob}`);
+    }
+  }
+  return lines;
+}
+
+async function openDirected(lineParts, compact, fragI, fragN) {
+  const kind = lineParts[0].slice(2);
+  const blob = lineParts[lineParts.length - 1];
+  const db = store();
+  const signets = Object.values(db.signets || {});
+  const data = b64d(blob);
+  if (kind === "K") {
+    const toShort = lineParts[1], fromShort = lineParts[2];
+    const local = signets.find(s => s.short === toShort);
+    if (!local) throw new Error("directed at a signet not on this device");
+    const contact = Object.values(db.contacts || {}).find(c => c.short === fromShort);
+    if (!contact) throw new Error("sender not in contacts");
+    const priv = await importLocalPriv(local);
+    const theirComp = b64d(contact.pk);
+    const theirPub = await SIGIL_P256.importCompressed(theirComp);
+    const myComp = b64d(local.pk);
+    const z = compact ? ".z" : "";
+    const infoCore = `${PROTOCOL}.K.${fromShort}.${toShort}${z}.${fragI}/${fragN}`;
+    const info = enc(infoCore);
+    const extra = new Uint8Array(info.length + theirComp.length + myComp.length);
+    extra.set(info, 0); extra.set(theirComp, info.length); extra.set(myComp, info.length + theirComp.length);
+    const key = await ecdhAesKey(priv, theirPub, extra);
+    const nonce = data.slice(0, 12), ct = data.slice(12);
+    const pt = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce, additionalData: info, tagLength: 128 }, key, ct));
+    const text = compact && window.SIGIL_CODEBOOK ? SIGIL_CODEBOOK.maybeExpand(pt) : dec(pt);
+    return `[signet ${contact.alias || fromShort} -> ${local.name}]\n${text}`;
+  }
+  if (kind === "E") {
+    const toShort = lineParts[1];
+    const local = signets.find(s => s.short === toShort);
+    if (!local) throw new Error("ephemeral packet is not for this device");
+    const ephComp = data.slice(0, 33);
+    const nonce = data.slice(33, 45);
+    const ct = data.slice(45);
+    const priv = await importLocalPriv(local);
+    const ephPub = await SIGIL_P256.importCompressed(ephComp);
+    const z = compact ? ".z" : "";
+    const info = enc(`${PROTOCOL}.E.${toShort}${z}.${fragI}/${fragN}`);
+    const key = await ecdhAesKey(priv, ephPub, info);
+    const pt = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce, additionalData: info, tagLength: 128 }, key, ct));
+    const text = compact && window.SIGIL_CODEBOOK ? SIGIL_CODEBOOK.maybeExpand(pt) : dec(pt);
+    return `[ephemeral -> ${local.name}]\n${text}`;
+  }
+  throw new Error("unknown directed kind");
 }
 
 function refreshLists() {
@@ -427,7 +536,7 @@ $("c-save").onclick = async () => {
   db.circles = db.circles || {};
   db.circles[name.toLowerCase()] = { name, pass, slug: slugify(name), fp };
   persist(db);
-  $("c-out").textContent = `S1+CIRCLE.${slugify(name)}.${name.replace(/\./g, "_")}.fp${fp}\n\nSaved locally. Share the passphrase out of band.`;
+  $("c-out").textContent = `S1+CIRCLE.${slugify(name)}.${name.replace(/\./g, "_")}.fp${fp}\n# say fingerprint aloud after you compare fp${fp} with your friend\n\nSaved locally. Share the passphrase out of band.`;
   refreshLists();
 };
 
@@ -479,11 +588,21 @@ $("seal-btn").onclick = async () => {
       const db = store();
       const rec = (db.circles || {})[target.toLowerCase()] || Object.values(db.circles || {}).find(c => c.slug === target || c.name.toLowerCase() === target.toLowerCase());
       if (!rec) throw new Error("Unknown circle. Save it in the Circle tab.");
-      const lines = await sealCircle(rec.name, rec.pass, text);
+      const lines = await sealCircle(rec.name, rec.pass, text, $("seal-compact").checked);
       out.textContent = lines.join("\n");
       return;
     }
-    throw new Error("Signet sealing in the browser talks JWK locally; use sigil.py to talk to CLI-made P-256 compressed keys for now. Circle mode is fully interopable.");
+    if (mode === "K" || mode === "E") {
+      const db = store();
+      const signets = Object.values(db.signets || {});
+      if (!signets.length) throw new Error("Forge a signet first.");
+      const contact = (db.contacts || {})[target.toLowerCase()] || Object.values(db.contacts || {}).find(c => c.short === target);
+      if (!contact) throw new Error("Unknown contact. Paste their S1+PK in the Signet tab.");
+      const lines = await sealToContact(signets[0], contact, text, mode === "E", $("seal-compact").checked);
+      out.textContent = lines.join("\n");
+      return;
+    }
+    throw new Error("Unknown mode.");
   } catch (e) {
     out.innerHTML = `<span class="bad">${e.message}</span>`;
   }
@@ -505,18 +624,32 @@ $("open-btn").onclick = async () => {
   for (const line of lines) {
     const parts = line.split(".");
     const kind = parts[0].slice(2);
-    if (kind !== "C") { msgs.push("only circle tokens can be opened in this page right now: " + line.slice(0, 24)); continue; }
-    let slug = parts[1];
+    if (kind === "K" || kind === "E") {
+      try {
+        let mid = parts.slice(1, -1);
+        let i = 1, n = 1, compact = false;
+        if (mid.length && mid[mid.length - 1].includes("/")) {
+          const [a, b] = mid.pop().split("/"); i = +a; n = +b;
+        }
+        if (mid.length && mid[mid.length - 1] === "z") { compact = true; mid.pop(); }
+        msgs.push(await openDirected([parts[0]].concat(mid).concat([parts[parts.length - 1]]), compact, i, n));
+      } catch (e) { msgs.push("failed directed: " + e.message); }
+      continue;
+    }
+    if (kind !== "C") { msgs.push("unknown token " + line.slice(0, 24)); continue; }
+    let mid = parts.slice(1, -1);
     let blob = parts[parts.length - 1];
-    let i = 1, n = 1;
-    if (parts.length >= 4 && parts[2].includes("/")) {
-      const [a, b] = parts[2].split("/");
+    let i = 1, n = 1, compact = false;
+    if (mid.length && mid[mid.length - 1].includes("/")) {
+      const [a, b] = mid.pop().split("/");
       i = +a; n = +b;
     }
+    if (mid.length && mid[mid.length - 1] === "z") { compact = true; mid.pop(); }
+    const slug = mid[0];
     const rec = Object.values(db.circles || {}).find(c => c.slug === slug || c.name.toLowerCase() === slug);
     if (!rec) { msgs.push(`no local circle for slug ${slug}`); continue; }
     try {
-      const pt = await openCircleLine(rec.name, rec.pass, blob, i, n);
+      const pt = await openCircleLine(rec.name, rec.pass, blob, i, n, compact);
       msgs.push(`[circle ${rec.name} ${i}/${n}]\n${pt}`);
     } catch (e) {
       msgs.push(`failed ${slug}: ${e.message}`);
@@ -525,7 +658,35 @@ $("open-btn").onclick = async () => {
   out.textContent = msgs.join("\n\n");
 };
 
+$("selftest-btn") && ($("selftest-btn").onclick = async () => {
+  const out = $("selftest-out");
+  try {
+    const name = "selftest-circle";
+    const pass = "molten copper 4";
+    const lines = await sealCircle(name, pass, "nether roof stash at 0 128 0", true);
+    const tok = lines[0];
+    const parts = tok.split(".");
+    const compact = parts.includes("z");
+    const pt = await openCircleLine(name, pass, parts[parts.length - 1], 1, 1, compact);
+    if (pt.replace(/\s+/g, " ").trim() !== "nether roof stash at 0 128 0") throw new Error("round-trip mismatch: " + pt);
+    out.textContent = "selftest ok\n" + tok;
+  } catch (e) {
+    out.innerHTML = '<span class="bad">' + e.message + "</span>";
+  }
+});
+
+if (window.SIGIL_LEXICON_V2) {
+  crypto.subtle.digest("SHA-256", new TextEncoder().encode(SIGIL_LEXICON_V2.join("\n") + "\n")).then(buf => {
+    const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+    const el = $("lex-hash");
+    if (el) el.textContent = " · lexicon " + hex.slice(0, 16);
+  });
+}
+
 refreshLists();
 </script>
+<script src="lexicon_v2.js"></script>
+<script src="codebook_v2.js"></script>
+<script src="p256.js"></script>
 </body>
 </html>
