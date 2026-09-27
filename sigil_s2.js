@@ -2,7 +2,8 @@
  * Same primitives and keys as S1: AES-256-GCM, PBKDF2-HMAC-SHA256 circle keys,
  * ECDH P-256 + HKDF-SHA256. Needs WebCrypto (browser or Node >= 20),
  * SIGIL_CODEBOOK (codebook_v2.js) for compact parts and SIGIL_P256 (p256.js)
- * for S2K / S2E.
+ * for S2K / S2E. S2S (signed circle, sigil 0.5.0) needs WebCrypto Ed25519
+ * (Node >= 20, Chrome 137+, Firefox 129+, Safari 17+).
  */
 (function (global) {
   const VERSION2 = "S2";
@@ -12,6 +13,9 @@
   const Z = 0x01, J = 0x02, M = 0x04, S = 0x08, RESERVED = 0xf0;
   const MID_LEN = 6, MAX_PARTS = 16, MAX_SENDER = 32;
   const NONCE_LEN = 12, TAG_LEN = 16, EPH_LEN = 33;
+  // S2S: the last part ends with keyid(8) || Ed25519 signature(64).
+  const KEYID_LEN = 8, SIG_LEN = 64, TRAILER = KEYID_LEN + SIG_LEN;
+  const SIG_DOMAIN = new Uint8Array([...new TextEncoder().encode("SIGIL.v2.sig"), 0]);
   const te = new TextEncoder();
   const td = new TextDecoder("utf-8", { fatal: true });
   const subtle = () => global.crypto.subtle;
@@ -113,11 +117,26 @@
     return b64Room(maxLine - prefixLen) - hdr - (ephLen || 0) - NONCE_LEN - TAG_LEN;
   }
 
-  // Same algorithm as sigil.s2_split, on code points.
-  function split(text, compact, sender, maxLine, prefixLen, ephLen) {
+  // Same algorithm as sigil.s2_split, on code points. `tail` bytes are reserved at the
+  // end of the last part (S2S trailer); if they do not fit, an empty part carries them.
+  function split(text, compact, sender, maxLine, prefixLen, ephLen, tail = 0) {
     const sfield = senderField(sender).length;
     const single = payloadRoom(maxLine, prefixLen, false, ephLen);
-    if (sfield + body(text, compact).bytes.length <= single) return [[text, false]];
+    if (sfield + body(text, compact).bytes.length + tail <= single) return [[text, false]];
+    const parts = splitMulti(text, compact, sfield, maxLine, prefixLen, ephLen);
+    if (tail) {
+      const room = payloadRoom(maxLine, prefixLen, true, ephLen);
+      if (tail > room) throw new Error("max_line is too small for an S2S signature part.");
+      const last = body(parts[parts.length - 1][0], compact).bytes.length + (parts.length === 1 ? sfield : 0);
+      if (parts.length === 1 || last + tail > room) parts.push(["", false]);
+    }
+    if (parts.length > MAX_PARTS) {
+      throw new Error(`S2 carries at most ${MAX_PARTS} parts; this message needs ${parts.length}. Shorten it or use S1.`);
+    }
+    return parts;
+  }
+
+  function splitMulti(text, compact, sfield, maxLine, prefixLen, ephLen) {
     const room = payloadRoom(maxLine, prefixLen, true, ephLen);
     if (room - sfield < 8) throw new Error("max_line is too small for an S2 fragment.");
     const size = (cps) => body(cps.join(""), compact).bytes.length;
@@ -144,18 +163,15 @@
       parts.push([rest.slice(0, cut).join(""), join]);
       rest = rest.slice(cut + (join ? 1 : 0));
     }
-    if (parts.length > MAX_PARTS) {
-      throw new Error(`S2 carries at most ${MAX_PARTS} parts; this message needs ${parts.length}. Shorten it or use S1.`);
-    }
     return parts;
   }
 
-  function frames(text, compact, sender, maxLine, prefixLen, ephLen) {
-    const parts = split(text, compact, sender, maxLine, prefixLen, ephLen);
+  function frames(text, compact, sender, maxLine, prefixLen, ephLen, tail = 0) {
+    const parts = split(text, compact, sender, maxLine, prefixLen, ephLen, tail);
     const total = parts.length;
     const mid = total > 1 ? randomBytes(MID_LEN) : new Uint8Array(0);
     return parts.map(([part, join], k) => {
-      const b = body(part, compact);
+      const b = part ? body(part, compact) : { bytes: new Uint8Array(0), used: false }; // S2S signature part: raw
       let flags = (b.used ? Z : 0) | (join ? J : 0);
       let sf = new Uint8Array(0);
       if (k === 0 && sender) { flags |= S; sf = senderField(sender); }
@@ -219,6 +235,70 @@
     return lines;
   }
 
+  // ---- S2S: signed circle messages (Ed25519 over the whole message) ----
+  async function keyId(spk) {
+    return new Uint8Array(await subtle().digest("SHA-256", spk)).slice(0, KEYID_LEN);
+  }
+  async function fingerprint(raw) {
+    return b64e(new Uint8Array(await subtle().digest("SHA-256", raw)));
+  }
+  function u16(n) { return Uint8Array.of(n >> 8, n & 0xff); }
+  // Same bytes as sigil.s2s_signed_bytes.
+  function signedBytes(ctx, keyid, parts) {
+    if (parts.length < 1 || parts.length > MAX_PARTS || keyid.length !== KEYID_LEN) throw new Error("bad S2S signing input");
+    const chunks = [SIG_DOMAIN, u16(ctx.length), ctx, keyid, Uint8Array.of(parts.length)];
+    for (const p of parts) chunks.push(Uint8Array.of(p.header.length), p.header, u16(p.pt.length), p.pt);
+    return concat(...chunks);
+  }
+  // signer: {spk: b64 raw Ed25519 public key, sign: Ed25519 private CryptoKey}
+  async function sealCircleSigned(name, passphrase, text, signer, opts = {}) {
+    const { compact = false, sender = "", maxLine = 256 } = opts;
+    const key = await circleKey(name, passphrase);
+    const prefix = `${VERSION2}S.${slugify(name)}.`;
+    const ctx = context("S", name);
+    const keyid = await keyId(b64d(signer.spk));
+    const fs = frames(text, compact, sender, maxLine, prefix.length, 0, TRAILER);
+    const sig = new Uint8Array(await subtle().sign({ name: "Ed25519" }, signer.sign, signedBytes(ctx, keyid, fs)));
+    const lines = [];
+    for (let k = 0; k < fs.length; k++) {
+      const pt = k === fs.length - 1 ? concat(fs[k].pt, keyid, sig) : fs[k].pt;
+      const nonce = randomBytes(NONCE_LEN);
+      const ct = await gcmSeal(key, nonce, pt, concat(fs[k].header, ctx));
+      lines.push(prefix + b64e(concat(fs[k].header, nonce, ct)));
+    }
+    return lines;
+  }
+  // keys: [{name, spk (b64)}]. Sets verified/signer/signerFp/keyid/error on each signed message;
+  // text stays null unless the signature verifies under a key whose key id matches.
+  async function verifySigned(messages, keys) {
+    for (const m of messages) {
+      if (m.mode !== "signed") continue;
+      Object.assign(m, { signed: true, verified: false, signer: null, signerFp: null, keyid: null, error: null });
+      const text = m.text;
+      m.text = null;
+      if (!m.complete) continue;
+      const last = m.parts[m.parts.length - 1];
+      m.keyid = hex(last.keyid);
+      const tbs = signedBytes(last.ctx, last.keyid, m.parts.map(p => ({ header: p.header, pt: p.payload })));
+      let candidates = 0;
+      for (const k of keys || []) {
+        const spk = b64d(k.spk);
+        if (hex(await keyId(spk)) !== m.keyid) continue;
+        candidates++;
+        const pub = await subtle().importKey("raw", spk, { name: "Ed25519" }, false, ["verify"]);
+        if (await subtle().verify({ name: "Ed25519" }, pub, last.sig, tbs)) {
+          Object.assign(m, { verified: true, signer: k.name, signerFp: await fingerprint(spk), text });
+          break;
+        }
+      }
+      if (!m.verified) {
+        m.error = candidates ? "BAD SIGNATURE: forged or altered by someone holding the circle key"
+          : `unknown signer key id ${m.keyid}`;
+      }
+    }
+    return messages;
+  }
+
   // local: {short, pk (b64 compressed), priv (ECDH CryptoKey)}; contact: {short, pk}
   async function sealDirected(local, contact, text, opts = {}) {
     const { ephemeral = false, compact = false, sender = "", maxLine = 256 } = opts;
@@ -252,13 +332,13 @@
   }
 
   function findTokens(text) {
-    return text.replace(/,/g, " ").split(/\s+/).filter(t => /^S2[CKE]\./.test(t));
+    return text.replace(/,/g, " ").split(/\s+/).filter(t => /^S2[CKES]\./.test(t));
   }
 
   function parseToken(token) {
     const fields = token.split(".");
     const kind = fields[0].slice(2);
-    if (fields[0].slice(0, 2) !== VERSION2 || !"CKE".includes(kind) || kind.length !== 1 || fields.length < 3) {
+    if (fields[0].slice(0, 2) !== VERSION2 || !"CKES".includes(kind) || kind.length !== 1 || fields.length < 3) {
       throw new Error("Not a SIGIL S2 message.");
     }
     const route = fields.slice(1, -1);
@@ -268,6 +348,16 @@
   }
 
   function result(frame, extra, pt) {
+    if (extra.mode === "signed") {
+      extra.header = frame.header;
+      if (frame.index === frame.total) {
+        if (pt.length < TRAILER) throw new Error("S2S last part is too short for its signature trailer.");
+        extra.keyid = pt.slice(pt.length - TRAILER, pt.length - SIG_LEN);
+        extra.sig = pt.slice(pt.length - SIG_LEN);
+        pt = pt.slice(0, pt.length - TRAILER);
+      }
+      extra.payload = pt;
+    }
     const { sender, text } = unpack(frame.flags, pt);
     return Object.assign({
       ok: true, version: 2, index: frame.index, total: frame.total, part: `${frame.index}/${frame.total}`,
@@ -279,14 +369,16 @@
   async function openToken(token, keyring) {
     const { kind, route, frame } = parseToken(token);
     const P = global.SIGIL_P256;
-    if (kind === "C") {
+    if (kind === "C" || kind === "S") {
       const slug = route[0];
       for (const c of keyring.circles || []) {
         if (slugify(c.name) !== slug && c.name.toLowerCase() !== slug) continue;
         const key = await circleKey(c.name, c.pass);
+        const ctx = context(kind, c.name);
         let pt;
-        try { pt = await gcmOpen(key, frame.nonce, frame.ct, concat(frame.header, context("C", c.name))); }
+        try { pt = await gcmOpen(key, frame.nonce, frame.ct, concat(frame.header, ctx)); }
         catch (e) { continue; }
+        if (kind === "S") return result(frame, { mode: "signed", circle: c.name, ctx }, pt);
         return result(frame, { mode: "circle", circle: c.name }, pt);
       }
       throw new Error(`Could not open circle message for slug '${slug}'.`);
@@ -320,8 +412,11 @@
   // [{complete, parts (ordered), text?, sender, missing}].
   function group(results) {
     const buckets = new Map();
+    let seq = 0;
     for (const r of results) {
-      const k = [r.mode, r.circle || "", r.to || "", r.from || "", r.mid, r.total].join("\u0000");
+      const k = [r.mode, r.circle || "", r.to || "", r.from || "", r.mid, r.total,
+        r.mode === "signed" && r.total === 1 ? seq : ""].join("\u0000"); // each signed single line is its own message
+      seq++;
       if (!buckets.has(k)) buckets.set(k, new Map());
       const b = buckets.get(k);
       if (!b.has(r.index)) b.set(r.index, r); // replayed duplicate ignored
@@ -343,5 +438,6 @@
     VERSION2, PROTOCOL2, FLAGS: { Z, J, M, S }, MID_LEN, MAX_PARTS, MAX_SENDER,
     b64e, b64d, b64Room, header, parseFrame, context, payloadRoom, split, frames, unpack,
     circleKey, ecdhKey, sealCircle, sealDirected, findTokens, parseToken, openToken, stitch, group, slugify,
+    TRAILER, keyId, fingerprint, signedBytes, sealCircleSigned, verifySigned,
   };
 })(typeof window !== "undefined" ? window : globalThis);

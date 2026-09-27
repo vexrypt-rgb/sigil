@@ -5,7 +5,7 @@ A public-facing encryption system for open chats and whispers
 (Minecraft, Discord, IRC, SMS, carrier pigeon).
 
 Protocol versions: S2 (default for sealing) and S1 (still opened; seal
-with --wire S1 for old peers). This file is both the reference
+with --wire S1 for old peers). S2S (signed circle, Ed25519) since 0.5.0. This file is both the reference
 implementation and the CLI.
 """
 
@@ -23,14 +23,14 @@ from pathlib import Path
 from typing import Optional
 
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 import codebook
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 # S1 constants. PROTOCOL also names the circle-key salt, which S2 reuses
 # unchanged (same keys, same keyrings). S2 constants live in the S2 section.
@@ -40,6 +40,7 @@ PBKDF2_ITERS = 210_000
 NONCE_LEN = 12
 TAG_LEN = 16  # AES-GCM tag, appended by AESGCM.encrypt
 P256_COMPRESSED_LEN = 33
+ED25519_PK_LEN = 32
 
 # Default keyring lives next to this script unless SIGIL_HOME is set.
 HOME = Path(os.environ.get("SIGIL_HOME", Path(__file__).resolve().parent / "keys"))
@@ -62,6 +63,11 @@ def b64d(text: str) -> bytes:
 def short_id(data: bytes, n: int = 4) -> str:
     """Stable public fingerprint, 4 chars."""
     return b64e(hashlib.sha256(data).digest())[:n].lower()
+
+
+def fingerprint(raw_public_key: bytes) -> str:
+    """Full public-key fingerprint: b64url(SHA-256(raw key)), 43 chars. short_id is its first 4, lowercased."""
+    return b64e(hashlib.sha256(raw_public_key).digest())
 
 
 def slugify(name: str, n: int = 4) -> str:
@@ -261,26 +267,67 @@ def _pk_bytes(pk: ec.EllipticCurvePublicKey) -> bytes:
     )
 
 
-def signet_create(name: str) -> dict:
-    sk = ec.generate_private_key(ec.SECP256R1())
-    pk = sk.public_key()
-    pem = sk.private_bytes(
+def _pem(sk) -> str:
+    return sk.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     ).decode("utf-8")
-    pk_b64 = b64e(_pk_bytes(pk))
+
+
+def _spk_bytes(pk: ed25519.Ed25519PublicKey) -> bytes:
+    return pk.public_bytes(encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw)
+
+
+def _sign_fields(sign_sk: ed25519.Ed25519PrivateKey) -> dict:
+    """Signet fields for the Ed25519 signing key used by S2S (0.5.0+)."""
+    spk = _spk_bytes(sign_sk.public_key())
+    return {"sign_alg": "Ed25519", "sign_pk": b64e(spk), "sign_short": short_id(spk), "sign_sk_pem": _pem(sign_sk)}
+
+
+def signet_record(name: str, sk: ec.EllipticCurvePrivateKey,
+                  sign_sk: Optional[ed25519.Ed25519PrivateKey] = None) -> dict:
+    """Keyring record for a signet: P-256 (S1K/S2K/S2E) plus an Ed25519 signing key (S2S)."""
+    pk = sk.public_key()
     rec = {
         "kind": "signet",
         "name": name,
         "short": short_id(_pk_bytes(pk)),
-        "pk": pk_b64,
-        "sk_pem": pem,
+        "pk": b64e(_pk_bytes(pk)),
+        "sk_pem": _pem(sk),
         "curve": "P-256",
         "created": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
+    if sign_sk is not None:
+        rec.update(_sign_fields(sign_sk))
+    return rec
+
+
+def signet_create(name: str) -> dict:
+    rec = signet_record(name, ec.generate_private_key(ec.SECP256R1()), ed25519.Ed25519PrivateKey.generate())
     save_json(signet_path(name), rec)
     return rec
+
+
+def signet_add_signing_key(name_or_short: str) -> dict:
+    """Give a pre-0.5 signet an Ed25519 signing key (keeps its P-256 key and short id)."""
+    rec = load_signet(name_or_short)
+    if rec.get("sign_pk"):
+        return rec
+    rec.update(_sign_fields(ed25519.Ed25519PrivateKey.generate()))
+    save_json(signet_path(rec["name"]), rec)
+    return rec
+
+
+def _sign_sk_from_rec(rec: dict) -> ed25519.Ed25519PrivateKey:
+    if not rec.get("sign_sk_pem"):
+        raise ValueError(f"Signet '{rec.get('name')}' has no signing key. Run: sigil signet upgrade {rec.get('name')}")
+    sk = serialization.load_pem_private_key(rec["sign_sk_pem"].encode("utf-8"), password=None)
+    if not isinstance(sk, ed25519.Ed25519PrivateKey):
+        raise ValueError("Signet signing key is not Ed25519.")
+    if b64e(_spk_bytes(sk.public_key())) != rec.get("sign_pk"):
+        raise ValueError("Signet signing key does not match its public key (corrupt record).")
+    return sk
 
 
 def load_signet(name_or_short: str) -> dict:
@@ -303,7 +350,7 @@ def load_contacts() -> dict:
     return load_json(p)
 
 
-def remember_contact(alias: str, pk_b64: str, name_hint: str = "") -> dict:
+def remember_contact(alias: str, pk_b64: str, name_hint: str = "", spk_b64: str = "") -> dict:
     raw = b64d(pk_b64)
     if len(raw) not in (33, 65):
         raise SystemExit("Contact public key has the wrong length.")
@@ -318,6 +365,13 @@ def remember_contact(alias: str, pk_b64: str, name_hint: str = "") -> dict:
         "short": short_id(_pk_bytes(pk)),
         "added": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
+    if spk_b64:
+        spk = b64d(spk_b64)
+        if len(spk) != ED25519_PK_LEN:
+            raise SystemExit("Contact signing key must be a 32-byte Ed25519 public key.")
+        ed25519.Ed25519PublicKey.from_public_bytes(spk)
+        entry["spk"] = b64e(spk)
+        entry["sshort"] = short_id(spk)
     book.setdefault("contacts", {})[alias.lower()] = entry
     # Also index by short id.
     book["contacts"][entry["short"]] = entry
@@ -525,7 +579,7 @@ def seal_to_signet(
     return lines
 
 
-_TOKEN_HEADS = ("S1C.", "S1K.", "S1E.", "S2C.", "S2K.", "S2E.")
+_TOKEN_HEADS = ("S1C.", "S1K.", "S1E.", "S2C.", "S2K.", "S2E.", "S2S.")
 
 
 def open_line(line: str) -> dict:
@@ -723,7 +777,12 @@ S2_RESERVED = 0xF0  # must be zero
 S2_MID_LEN = 6      # 48-bit random message id (multi-part only)
 S2_MAX_PARTS = 16
 S2_MAX_SENDER = 32  # bytes of UTF-8
-S2_KINDS = ("C", "K", "E")
+S2_KINDS = ("C", "K", "E", "S")
+# S2S (signed circle, 0.5.0): the last part carries keyid || Ed25519 signature.
+S2S_KEYID_LEN = 8
+S2S_SIG_LEN = 64
+S2S_TRAILER = S2S_KEYID_LEN + S2S_SIG_LEN
+S2S_SIG_DOMAIN = b"SIGIL.v2.sig\x00"
 DEFAULT_WIRE = os.environ.get("SIGIL_WIRE", "S2").strip().upper() or "S2"
 
 
@@ -816,7 +875,7 @@ def s2_payload_room(max_line: int, prefix_len: int, multi: bool, eph_len: int = 
 
 
 def s2_split(
-    text: str, compact: bool, sender: str, max_line: int, prefix_len: int, eph_len: int = 0
+    text: str, compact: bool, sender: str, max_line: int, prefix_len: int, eph_len: int = 0, tail: int = 0
 ) -> list[tuple[str, bool]]:
     """
     Cut text into (part_text, join) pairs that fit S2 lines. Rejoining is
@@ -824,11 +883,35 @@ def s2_split(
     Compact mode prefers to cut at a space and consumes it (join=True), so
     the codebook never has to carry boundary whitespace; otherwise a part is
     cut mid-word (join=False), which is still exact.
+
+    `tail` bytes are reserved at the end of the LAST part (S2S: keyid ||
+    signature). If the last text part has no room for them, an extra part
+    with empty text carries the tail alone.
     """
     sfield = len(_s2_sender_field(sender))
     single = s2_payload_room(max_line, prefix_len, False, eph_len)
-    if sfield + len(_s2_body(text, compact)[0]) <= single:
+    if sfield + len(_s2_body(text, compact)[0]) + tail <= single:
         return [(text, False)]
+    parts = _s2_split_multi(text, compact, sfield, max_line, prefix_len, eph_len)
+    if tail:
+        room = s2_payload_room(max_line, prefix_len, True, eph_len)
+        if tail > room:
+            raise ValueError("max_line is too small for an S2S signature part.")
+        last = len(_s2_body(parts[-1][0], compact)[0]) + (sfield if len(parts) == 1 else 0)
+        if len(parts) == 1 or last + tail > room:
+            parts.append(("", False))
+    if len(parts) > S2_MAX_PARTS:
+        raise ValueError(
+            f"S2 carries at most {S2_MAX_PARTS} parts; this message needs {len(parts)}. "
+            "Shorten it, raise --max-line, or use --wire S1."
+        )
+    return parts
+
+
+def _s2_split_multi(
+    text: str, compact: bool, sfield: int, max_line: int, prefix_len: int, eph_len: int
+) -> list[tuple[str, bool]]:
+    """The multi-part cut of s2_split (the text does not fit one line)."""
     room = s2_payload_room(max_line, prefix_len, True, eph_len)
     if room - sfield < 8:
         raise ValueError("max_line is too small for an S2 fragment.")
@@ -866,24 +949,20 @@ def s2_split(
                 cut, join = c, True
         parts.append((rest[:cut], join))
         rest = rest[cut + (1 if join else 0):]
-    if len(parts) > S2_MAX_PARTS:
-        raise ValueError(
-            f"S2 carries at most {S2_MAX_PARTS} parts; this message needs {len(parts)}. "
-            "Shorten it, raise --max-line, or use --wire S1."
-        )
     return parts
 
 
 def s2_frames(
-    text: str, compact: bool, sender: str, max_line: int, prefix_len: int, eph_len: int = 0
+    text: str, compact: bool, sender: str, max_line: int, prefix_len: int, eph_len: int = 0, tail: int = 0
 ) -> list[tuple[bytes, bytes]]:
-    """Return (header, plaintext) per part, ready for AES-GCM."""
-    parts = s2_split(text, compact, sender, max_line, prefix_len, eph_len)
+    """Return (header, plaintext) per part, ready for AES-GCM (tail bytes not included)."""
+    parts = s2_split(text, compact, sender, max_line, prefix_len, eph_len, tail)
     total = len(parts)
     mid = os.urandom(S2_MID_LEN) if total > 1 else b""
     out = []
     for i, (part, join) in enumerate(parts, start=1):
-        body, used_z = _s2_body(part, compact)
+        # The S2S signature-only part is always raw (empty body, Z=0).
+        body, used_z = _s2_body(part, compact) if part else (b"", False)
         flags = (S2_Z if used_z else 0) | (S2_J if join else 0)
         sfield = b""
         if i == 1 and sender:
@@ -923,6 +1002,56 @@ def seal_circle_s2(
     ctx = s2_context("C", circle["name"])
     lines = []
     for header, pt in s2_frames(plaintext, compact, sender, max_line, len(prefix)):
+        nonce = os.urandom(NONCE_LEN)
+        ct = AESGCM(key).encrypt(nonce, pt, header + ctx)
+        lines.append(prefix + b64e(header + nonce + ct))
+    return _s2_check_lines(lines, max_line)
+
+
+def s2s_keyid(spk: bytes) -> bytes:
+    """S2S key id: the first 8 bytes of SHA-256(Ed25519 public key) (= the fingerprint's first 8 bytes)."""
+    return hashlib.sha256(spk).digest()[:S2S_KEYID_LEN]
+
+
+def s2s_signed_bytes(ctx: bytes, keyid: bytes, parts: list[tuple[bytes, bytes]]) -> bytes:
+    """
+    What the S2S Ed25519 signature covers: the whole message.
+
+      "SIGIL.v2.sig" 0x00 || u16(len ctx) ctx || keyid(8) || u8(n)
+        || for i in 1..n: u8(len header_i) header_i || u16(len pt_i) pt_i
+
+    header_i are the exact header bytes (flags, part byte, message id) and pt_i
+    the exact part plaintexts (sender field + body, codebook-packed if Z)
+    without the trailer. All lengths big-endian.
+    """
+    if not 1 <= len(parts) <= S2_MAX_PARTS or len(keyid) != S2S_KEYID_LEN:
+        raise ValueError("bad S2S signing input")
+    out = bytearray(S2S_SIG_DOMAIN)
+    out += len(ctx).to_bytes(2, "big") + ctx + keyid + bytes([len(parts)])
+    for header, pt in parts:
+        out += bytes([len(header)]) + header + len(pt).to_bytes(2, "big") + pt
+    return bytes(out)
+
+
+def seal_circle_signed_s2(
+    circle: dict, signet: dict, plaintext: str, sender: str = "", max_line: int = 256, compact: bool = False
+) -> list[str]:
+    """
+    S2S: an S2C-style circle message whose last part ends with
+    keyid(8) || Ed25519(signet signing key, s2s_signed_bytes(...)).
+    Circle confidentiality plus proof of which signet wrote the whole message.
+    """
+    sign_sk = _sign_sk_from_rec(signet)
+    keyid = s2s_keyid(_spk_bytes(sign_sk.public_key()))
+    key = derive_circle_key(circle["name"], circle["passphrase"])
+    prefix = f"{VERSION2}S.{circle['slug']}."
+    ctx = s2_context("S", circle["name"])
+    frames = s2_frames(plaintext, compact, sender, max_line, len(prefix), tail=S2S_TRAILER)
+    sig = sign_sk.sign(s2s_signed_bytes(ctx, keyid, frames))
+    lines = []
+    for k, (header, pt) in enumerate(frames):
+        if k == len(frames) - 1:
+            pt = pt + keyid + sig
         nonce = os.urandom(NONCE_LEN)
         ct = AESGCM(key).encrypt(nonce, pt, header + ctx)
         lines.append(prefix + b64e(header + nonce + ct))
@@ -994,6 +1123,31 @@ def open_line_s2(token: str) -> dict:
         out["plaintext"] = text
         return out
 
+    if kind == "S":
+        if len(route) != 1:
+            raise ValueError("S2 signed token needs exactly one slug.")
+        slug = route[0]
+        for circle in list_circles():
+            if circle["slug"] != slug and circle["name"].lower() != slug:
+                continue
+            key = derive_circle_key(circle["name"], circle["passphrase"])
+            ctx = s2_context("S", circle["name"])
+            try:
+                pt = AESGCM(key).decrypt(fr["nonce"], fr["ct"], fr["header"] + ctx)
+            except Exception:
+                continue
+            extra = {"mode": "signed", "circle": circle["name"], "slug": circle["slug"],
+                     "header_hex": fr["header"].hex(), "ctx_hex": ctx.hex()}
+            if fr["index"] == fr["total"]:
+                if len(pt) < S2S_TRAILER:
+                    raise ValueError("S2S last part is too short for its signature trailer.")
+                pt, trailer = pt[:-S2S_TRAILER], pt[-S2S_TRAILER:]
+                extra["keyid"] = trailer[:S2S_KEYID_LEN].hex()
+                extra["sig_hex"] = trailer[S2S_KEYID_LEN:].hex()
+            extra["payload_hex"] = pt.hex()
+            return finish(pt, extra)
+        raise ValueError(f"Could not open signed circle message for slug '{slug}'. Wrong circle or passphrase.")
+
     if kind == "C":
         if len(route) != 1:
             raise ValueError("S2 circle token needs exactly one slug.")
@@ -1045,10 +1199,57 @@ def open_line_s2(token: str) -> dict:
 
 
 def s2_capacity(mode: str, max_line: int = 256, multi: bool = False, slug_len: int = 4) -> int:
-    """Exact plaintext bytes per S2 line (no sender field)."""
-    prefix = {"C": 5 + slug_len, "K": 14, "E": 9}[mode]
+    """
+    Exact plaintext bytes per S2 line (no sender field). For S the figure is
+    the last (or only) line, which also carries the 72-byte signature trailer;
+    earlier S2S parts carry as much as S2C parts.
+    """
+    prefix = {"C": 5 + slug_len, "S": 5 + slug_len, "K": 14, "E": 9}[mode]
     eph = P256_COMPRESSED_LEN if mode == "E" else 0
-    return max(0, s2_payload_room(max_line, prefix, multi, eph))
+    tail = S2S_TRAILER if mode == "S" else 0
+    return max(0, s2_payload_room(max_line, prefix, multi, eph) - tail)
+
+
+def signing_keys() -> list[dict]:
+    """Every Ed25519 public key this keyring can verify with: own signets and contacts."""
+    out, seen = [], set()
+    for rec in list_signets():
+        if rec.get("sign_pk") and rec["sign_pk"] not in seen:
+            seen.add(rec["sign_pk"])
+            out.append({"name": rec["name"], "spk": rec["sign_pk"], "own": True})
+    for entry in load_contacts().get("contacts", {}).values():
+        if entry.get("spk") and entry["spk"] not in seen:
+            seen.add(entry["spk"])
+            out.append({"name": entry.get("alias") or entry.get("name_hint"), "spk": entry["spk"], "own": False})
+    return out
+
+
+def s2s_verify(parts: list[dict], keys: Optional[list[dict]] = None) -> dict:
+    """
+    Verify a complete S2S message (opened parts in index order). Returns
+    {"verified": bool, "signer": name or None, "signer_fp": fingerprint or None,
+     "keyid": hex, "error": str or None}. Only keys whose key id matches are
+    tried; the signature must verify under the full public key.
+    """
+    last = parts[-1]
+    keyid = bytes.fromhex(last["keyid"])
+    sig = bytes.fromhex(last["sig_hex"])
+    ctx = bytes.fromhex(last["ctx_hex"])
+    tbs = s2s_signed_bytes(ctx, keyid, [(bytes.fromhex(r["header_hex"]), bytes.fromhex(r["payload_hex"]))
+                                        for r in parts])
+    keys = signing_keys() if keys is None else keys
+    candidates = [k for k in keys if s2s_keyid(b64d(k["spk"])) == keyid]
+    for k in candidates:
+        spk = b64d(k["spk"])
+        try:
+            ed25519.Ed25519PublicKey.from_public_bytes(spk).verify(sig, tbs)
+        except Exception:
+            continue
+        return {"verified": True, "signer": k["name"], "signer_fp": fingerprint(spk), "keyid": keyid.hex(),
+                "error": None}
+    err = ("BAD SIGNATURE: forged or altered by someone holding the circle key" if candidates
+           else f"unknown signer key id {keyid.hex()} (import their S2+PK announcement)")
+    return {"verified": False, "signer": None, "signer_fp": None, "keyid": keyid.hex(), "error": err}
 
 
 def open_messages(text: str) -> list[dict]:
@@ -1076,16 +1277,23 @@ def announce_circle(circle: dict) -> str:
 
 
 def announce_signet(signet: dict) -> str:
-    return f"S1+PK.{signet['name'].replace('.', '_')}.{signet['short']}.{signet['pk']}"
+    """S2+PK (P-256 + Ed25519 signing key, 0.5.0+) when the signet has a signing key, else S1+PK."""
+    name = signet['name'].replace('.', '_')
+    if signet.get("sign_pk"):
+        return f"S2+PK.{name}.{signet['short']}.{signet['pk']}.{signet['sign_pk']}"
+    return f"S1+PK.{name}.{signet['short']}.{signet['pk']}"
 
 
 def parse_announcement(line: str) -> dict:
     raw = line.strip()
     for token in raw.replace(",", " ").split():
-        if token.startswith("S1+"):
+        if token.startswith("S1+") or token.startswith("S2+"):
             raw = token
             break
     parts = raw.split(".")
+    if parts[0] == "S2+PK" and len(parts) == 5:
+        return {"kind": "signet-announcement", "name": parts[1], "short": parts[2], "pk": parts[3],
+                "spk": parts[4]}
     if parts[0] == "S1+CIRCLE" and len(parts) >= 4:
         return {"kind": "circle-announcement", "slug": parts[1], "name": parts[2], "fp": parts[3]}
     if parts[0] == "S1+PK" and len(parts) >= 4:
@@ -1174,6 +1382,10 @@ def build_parser() -> argparse.ArgumentParser:
     ssub.add_parser("list")
     ss = ssub.add_parser("show")
     ss.add_argument("name")
+    su = ssub.add_parser("upgrade", help="Add an Ed25519 signing key (S2S) to an older signet")
+    su.add_argument("name")
+
+    sub.add_parser("fingerprint", help="Full public-key fingerprints of your signets and contacts")
 
     pub = sub.add_parser("publish", help="Print every public announcement you can paste")
 
@@ -1181,7 +1393,7 @@ def build_parser() -> argparse.ArgumentParser:
     ctsub = ct.add_subparsers(dest="ctcmd", required=True)
     add = ctsub.add_parser("add")
     add.add_argument("alias")
-    add.add_argument("key", help="S1+PK announcement or raw public key")
+    add.add_argument("key", help="S2+PK / S1+PK announcement or raw public key")
     ctsub.add_parser("list")
 
     seal = sub.add_parser("seal", help="Encrypt a message")
@@ -1193,7 +1405,9 @@ def build_parser() -> argparse.ArgumentParser:
                            "can claim any name). S1: loose ' #name' suffix, not authenticated")
     seal.add_argument("--wire", choices=["S1", "S2", "s1", "s2"], default=None,
                       help="Wire format to emit (default S2, or $SIGIL_WIRE). Use S1 for old peers")
-    seal.add_argument("--from-signet", default="", help="Which local signet to send as (signet mode)")
+    seal.add_argument("--from-signet", default="", help="Which local signet to send or sign as")
+    seal.add_argument("--sign", action="store_true",
+                      help="Circle only: S2S, sign the whole message with your signet's Ed25519 key")
     seal.add_argument("--ephemeral", action="store_true", help="Use a one-time key (S2E/S1E, forward secrecy)")
     seal.add_argument("--max-line", type=int, default=256, help="Channel character limit (Minecraft=256)")
     seal.add_argument(
@@ -1299,10 +1513,33 @@ def cmd_signet(args: argparse.Namespace) -> None:
             print("No signets yet.")
             return
         for rec in rows:
-            print(f"  {rec['short']:6}  {rec['name']:20}  {rec['created']}")
+            sign = f"sign={rec['sign_short']}" if rec.get("sign_pk") else "no signing key (sigil signet upgrade)"
+            print(f"  {rec['short']:6}  {rec['name']:20}  {sign}  {rec['created']}")
     elif args.scmd == "show":
         rec = load_signet(args.name)
         print(announce_signet(rec))
+    elif args.scmd == "upgrade":
+        rec = signet_add_signing_key(args.name)
+        print(f"Signet '{rec['name']}' can sign (S2S). New announcement:")
+        print(announce_signet(rec))
+
+
+def cmd_fingerprint(_: argparse.Namespace) -> None:
+    rows = 0
+    for rec in list_signets():
+        rows += 1
+        print(f"me       {rec['name']:16}  fp={fingerprint(b64d(rec['pk']))}"
+              + (f"  sfp={fingerprint(b64d(rec['sign_pk']))}" if rec.get("sign_pk") else ""))
+    seen = set()
+    for entry in load_contacts().get("contacts", {}).values():
+        if entry["pk"] in seen:
+            continue
+        seen.add(entry["pk"])
+        rows += 1
+        print(f"contact  {entry['alias']:16}  fp={fingerprint(b64d(entry['pk']))}"
+              + (f"  sfp={fingerprint(b64d(entry['spk']))}" if entry.get("spk") else ""))
+    if not rows:
+        print("No signets or contacts.")
 
 
 def cmd_publish(_: argparse.Namespace) -> None:
@@ -1320,12 +1557,13 @@ def cmd_publish(_: argparse.Namespace) -> None:
 def cmd_contact(args: argparse.Namespace) -> None:
     if args.ctcmd == "add":
         key = args.key.strip()
-        if key.startswith("S1+PK"):
+        if key.startswith("S1+PK") or key.startswith("S2+PK"):
             ann = parse_announcement(key)
-            entry = remember_contact(args.alias, ann["pk"], ann["name"])
+            entry = remember_contact(args.alias, ann["pk"], ann["name"], ann.get("spk", ""))
         else:
             entry = remember_contact(args.alias, key, args.alias)
-        print(f"Saved {entry['alias']}  short={entry['short']}")
+        print(f"Saved {entry['alias']}  short={entry['short']}"
+              + (f"  sign={entry['sshort']}" if entry.get("spk") else "  (no signing key: cannot verify S2S)"))
     elif args.ctcmd == "list":
         book = load_contacts().get("contacts", {})
         seen = set()
@@ -1369,8 +1607,17 @@ def cmd_seal(args: argparse.Namespace) -> None:
     wire = (args.wire or DEFAULT_WIRE).upper()
     if wire not in ("S1", "S2"):
         raise SystemExit(f"Unknown wire format '{wire}'. Use S2 (default) or S1.")
+    if args.sign and (not args.circle or wire != "S2"):
+        raise SystemExit("--sign needs --circle and the S2 wire (it emits S2S).")
     try:
-        if args.circle:
+        if args.circle and args.sign:
+            signets = list_signets()
+            if not signets:
+                raise SystemExit("Create a local signet first: sigil signet new YourName")
+            local = load_signet(args.from_signet) if args.from_signet else signets[0]
+            lines = seal_circle_signed_s2(load_circle(args.circle), local, msg, sender=args.sender,
+                                          max_line=args.max_line, compact=args.compact)
+        elif args.circle:
             circle = load_circle(args.circle)
             if wire == "S2":
                 lines = seal_circle_s2(circle, msg, sender=args.sender, max_line=args.max_line,
@@ -1402,7 +1649,7 @@ def cmd_seal(args: argparse.Namespace) -> None:
 
 def _open_meta(r: dict, tail: str) -> str:
     meta = f"[{r['mode']}"
-    if r["mode"] == "circle":
+    if r["mode"] in ("circle", "signed"):
         meta += f" {r['circle']}"
         try:
             fp = load_circle(r["circle"])["fingerprint"]
@@ -1414,7 +1661,8 @@ def _open_meta(r: dict, tail: str) -> str:
     if r.get("sender"):
         # S2 sender field: authenticated as "written by a key holder". In a
         # circle any member can claim any name; only S2K/S1K prove identity.
-        note = {"circle": " (circle member claim)", "ephemeral": " (unverified claim)"}.get(r["mode"], "")
+        note = {"circle": " (circle member claim)", "ephemeral": " (unverified claim)",
+                "signed": " (claimed name; see signer)"}.get(r["mode"], "")
         meta += f" sender={r['sender']}{note}"
     return f"{meta} {tail}]"
 
@@ -1426,9 +1674,13 @@ def assemble_messages(opened: list[dict]) -> list[dict]:
      "missing": [indexes], "text": stitched text or None}.
     S2 parts are grouped by their authenticated message id, so parts of two
     different messages never combine. A replayed duplicate part is ignored.
+    S2S (mode "signed") messages are verified once complete and also carry
+    {"signed": True, "verified", "signer", "signer_fp", "keyid", "error"};
+    their "text" is None unless the signature verified under a known key.
+    Each single-line S2S token is its own message.
     """
     groups: dict[tuple, dict] = {}
-    for r in opened:
+    for seq, r in enumerate(opened):
         i, n = 1, 1
         part = r.get("part") or "1/1"
         if "/" in part:
@@ -1437,6 +1689,8 @@ def assemble_messages(opened: list[dict]) -> list[dict]:
                 i, n = int(a), int(b)
         version = r.get("version", 1)
         key = (version, r.get("mode"), r.get("circle"), r.get("to"), r.get("from"), r.get("mid"), n)
+        if r.get("mode") == "signed" and n == 1:
+            key += (seq,)
         g = groups.setdefault(key, {"n": n, "version": version, "by_index": {}, "all": []})
         g["by_index"].setdefault(i, r)
         g["all"].append(r)
@@ -1452,8 +1706,16 @@ def assemble_messages(opened: list[dict]) -> list[dict]:
                 text = stitch_parts([(r["plaintext"], r["codebook"], r["join"]) for r in ordered])
             else:
                 text = stitch_parts([(r["plaintext"], bool(r.get("codebook"))) for r in ordered])
-        out.append({"complete": complete, "n": n, "version": g["version"], "parts": ordered,
-                    "all": g["all"], "missing": missing, "text": text})
+        m = {"complete": complete, "n": n, "version": g["version"], "parts": ordered,
+             "all": g["all"], "missing": missing, "text": text}
+        if ordered and ordered[0].get("mode") == "signed":
+            m["signed"] = True
+            m.update({"verified": False, "signer": None, "signer_fp": None, "keyid": None, "error": None})
+            if complete:
+                m.update(s2s_verify(ordered))
+                if not m["verified"]:
+                    m["text"] = None
+        out.append(m)
     return out
 
 
@@ -1467,6 +1729,22 @@ def cmd_open(args: argparse.Namespace) -> None:
     if not opened and not failed:
         raise SystemExit("Nothing to open.")
     messages = assemble_messages(opened)
+    # S2S: print only verified messages, never unverified parts.
+    for m in messages:
+        if not m.get("signed"):
+            continue
+        if not m["complete"]:
+            have = ",".join(r["part"].split("/")[0] for r in m["parts"])
+            print(f"# incomplete S2S message {m['parts'][0]['mid']}: have part(s) {have} of {m['n']}",
+                  file=sys.stderr)
+        elif not m["verified"]:
+            print(f"# S2S message NOT shown: {m['error']}", file=sys.stderr)
+        else:
+            meta = _open_meta(m["parts"][0], f"signer={m['signer']} sfp={m['signer_fp']} {m['n']} part(s)")
+            print(meta)
+            print(m["text"])
+            append_transcript(meta, m["text"])
+    messages = [m for m in messages if not m.get("signed")]
     # Complete multi-part messages first, then single lines and stray parts.
     for m in messages:
         if m["complete"] and m["n"] > 1:
@@ -1502,6 +1780,7 @@ def cmd_info(_: argparse.Namespace) -> None:
               S2C S1C  circle     shared passphrase, best for a friend group on one server
               S2K S1K  signet     static P-256 ECDH, compact directed whisper
               S2E S1E  ephemeral  one-time P-256 key, forward secrecy, larger header
+              S2S      signed     circle message + Ed25519 signature over the whole message
 
             S2 adds an authenticated frame header: codebook flag, exact
             rejoin flag, i/n, 48-bit message id (multi-part only), and an
@@ -1511,6 +1790,7 @@ def cmd_info(_: argparse.Namespace) -> None:
             Primitives
               Circle key   PBKDF2-HMAC-SHA256, {PBKDF2_ITERS} iterations
               Directed key ECDH P-256 + HKDF-SHA256
+              Signature    Ed25519 (S2S), over every header and part plaintext
               Seal         AES-256-GCM, 96-bit random nonce, AAD binds context
               Encoding     unpadded URL-safe base64 (A-Za-z0-9-_)
 
@@ -1519,6 +1799,7 @@ def cmd_info(_: argparse.Namespace) -> None:
               S2C  {s2_capacity('C'):>5}      {s2_capacity('C', multi=True)}
               S2K  {s2_capacity('K'):>5}      {s2_capacity('K', multi=True)}
               S2E  {s2_capacity('E'):>5}      {s2_capacity('E', multi=True)}
+              S2S  {s2_capacity('S'):>5}      {s2_capacity('C', multi=True)} (last part {s2_capacity('S', multi=True)}: 72 B keyid+signature)
               S1 carries a few bytes less per line (python3 tools/capacity.py).
             Longer messages split into i/n fragments (S2: at most {S2_MAX_PARTS}).
             A whisper spends part of the 256 on "/msg <name> ": pass --max-line.
@@ -1548,6 +1829,8 @@ def main(argv: Optional[list[str]] = None) -> None:
         cmd_circle(args)
     elif args.cmd == "signet":
         cmd_signet(args)
+    elif args.cmd == "fingerprint":
+        cmd_fingerprint(args)
     elif args.cmd == "publish":
         cmd_publish(args)
     elif args.cmd == "contact":
@@ -1635,6 +1918,20 @@ def cmd_selftest() -> None:
             assert k2["plaintext"] == "don't sell the elytra" and k2["version"] == 2, k2
             e2 = open_line(seal_to_signet_s2(steve, find_contact("Alex"), "one time", ephemeral=True)[0])
             assert e2["plaintext"] == "one time", e2
+            # S2S: signed circle message, single and multi-part, verified; impersonation fails.
+            remember_contact("Steve", steve["pk"], "Steve", steve["sign_pk"])
+            deep = load_circle("deepcave")
+            for text in ("portal at 1847 12 -320", "abcdefghij " * 40):
+                sl = seal_circle_signed_s2(deep, steve, text.strip(), sender="Steve", compact=True)
+                assert all(x.startswith("S2S.") for x in sl), sl
+                msgs = assemble_messages([open_line(x) for x in sl])
+                assert len(msgs) == 1 and msgs[0]["verified"] and msgs[0]["signer"] in ("Steve",), msgs[0]
+                assert msgs[0]["text"].lower() == text.strip().lower(), msgs[0]["text"]
+            mallory = signet_record("Mallory", ec.generate_private_key(ec.SECP256R1()),
+                                    ed25519.Ed25519PrivateKey.generate())
+            forged = assemble_messages([open_line(x) for x in seal_circle_signed_s2(deep, mallory, "I am Steve",
+                                                                                    sender="Steve")])
+            assert not forged[0]["verified"] and forged[0]["text"] is None, forged[0]
             token = wrap_backup("backup pass 99")
             assert token.startswith("S1B.")
             restored = unwrap_backup(token, "backup pass 99")
@@ -1644,6 +1941,7 @@ def cmd_selftest() -> None:
         print("  signet  S1K")
         print("  eph     S1E")
         print("  S2      S2C (raw, compact i/n, sender) / S2K / S2E")
+        print("  S2S     signed circle (Ed25519), unknown signer refused")
         print("  chatter embedding")
         print("  codebook compact")
         print("  speak / dice / backup")

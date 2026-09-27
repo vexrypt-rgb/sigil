@@ -140,6 +140,7 @@
           <option value="C">Circle (shared passphrase)</option>
           <option value="K">Signet (to a contact)</option>
           <option value="E">Ephemeral (forward secrecy)</option>
+          <option value="S">Signed circle (circle + your signature, S2 only)</option>
         </select>
       </div>
       <div>
@@ -166,12 +167,12 @@
     <button class="go" id="seal-btn">Seal into chat line</button>
     <button class="go ghost" id="copy-seal">Copy</button>
     <div class="out" id="seal-out"></div>
-    <p class="hint">Minecraft public chat and whispers cap a line at 256 characters. Long messages split into fragments. Paste each fragment as its own chat line. In a circle the S2 sender name is sealed, but any circle member can claim any name; only signet mode proves who sent it.</p>
+    <p class="hint">Minecraft public chat and whispers cap a line at 256 characters. Long messages split into fragments. Paste each fragment as its own chat line. In plain circle mode the S2 sender name is sealed, but any circle member can claim any name. Signed circle (S2S) adds an Ed25519 signature from your signet, so readers who have your S2+PK announcement can check it was you. It costs 72 bytes per message, often one extra line.</p>
   </section>
 
   <section class="panel" id="open">
     <label>Ciphertext from chat</label>
-    <textarea id="open-text" placeholder="S2C.deep.AIyA... or S1C.deep.v3k1..."></textarea>
+    <textarea id="open-text" placeholder="S2C.deep.AIyA... or S2S.deep.AIyA... or S1C.deep.v3k1..."></textarea>
     <button class="go" id="open-btn">Open</button>
     <div class="out" id="open-out"></div>
   </section>
@@ -207,8 +208,8 @@
     </div>
     <button class="go" id="s-new">Forge a new signet</button>
     <button class="go ghost" id="s-pub">Show my public announcement</button>
-    <label>Paste someone else's S1+PK announcement</label>
-    <input id="ct-ann" placeholder="S1+PK.Alex.k9wq....">
+    <label>Paste someone else's S2+PK (or older S1+PK) announcement</label>
+    <input id="ct-ann" placeholder="S2+PK.Alex.k9wq....">
     <button class="go ghost" id="ct-add">Remember contact</button>
     <div class="out" id="s-out"></div>
     <label>Local signets / contacts</label>
@@ -222,6 +223,7 @@
       <kbd>S2C.slug.blob</kbd> — AES-256-GCM under a PBKDF2-SHA256 circle key (210000 iterations).<br>
       <kbd>S2K.to.from.blob</kbd> — P-256 ECDH + HKDF-SHA256 + AES-256-GCM.<br>
       <kbd>S2E.to.blob</kbd> — ephemeral P-256 sender key, then the same seal.<br>
+      <kbd>S2S.slug.blob</kbd> — S2C seal whose last part ends with an 8-byte key id and an Ed25519 signature over every part, the message id and the circle.<br>
       Blob is <kbd>header || [eph key] || nonce || ciphertext || tag</kbd> in unpadded URL-safe base64.
       The header (flags, part i/n, 48-bit message id) is authenticated, so parts cannot be relabelled or
       spliced across messages, and fragments rejoin exactly. S1 tokens still open; pick S1 above for old peers.
@@ -365,12 +367,29 @@ async function generateSignet(name) {
   const compressed = compressP256(pkRaw);
   const skJwk = await crypto.subtle.exportKey("jwk", kp.privateKey);
   const pkJwk = await crypto.subtle.exportKey("jwk", kp.publicKey);
-  return {
+  const rec = {
     name,
     short: shortId(await sha256(compressed)),
     pk: b64e(compressed),
     skJwk, pkJwk
   };
+  // Ed25519 signing key for S2S. Older browsers without WebCrypto Ed25519 get an S1+PK-only signet.
+  try {
+    const sk = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+    rec.signJwk = await crypto.subtle.exportKey("jwk", sk.privateKey);
+    rec.spk = rec.signJwk.x;
+  } catch (e) { /* no Ed25519 here */ }
+  return rec;
+}
+
+function announcement(s) {
+  const name = s.name.replace(/\./g, "_");
+  return s.spk ? `S2+PK.${name}.${s.short}.${s.pk}.${s.spk}` : `S1+PK.${name}.${s.short}.${s.pk}`;
+}
+
+async function importLocalSign(signet) {
+  if (!signet.signJwk) throw new Error(`Signet ${signet.name} has no signing key (forged in an older browser). Forge a new one.`);
+  return crypto.subtle.importKey("jwk", signet.signJwk, { name: "Ed25519" }, false, ["sign"]);
 }
 
 function compressP256(raw) {
@@ -520,12 +539,12 @@ function refreshLists() {
   const signets = db.signets || {};
   const contacts = db.contacts || {};
   const rows = [];
-  for (const s of Object.values(signets)) rows.push(`<div>me ${s.short} · ${s.name}</div>`);
+  for (const s of Object.values(signets)) rows.push(`<div>me ${s.short} · ${s.name}${s.spk ? " · signs" : ""}</div>`);
   const seen = new Set();
   for (const c of Object.values(contacts)) {
     if (seen.has(c.short)) continue;
     seen.add(c.short);
-    rows.push(`<div>peer ${c.short} · ${c.alias}</div>`);
+    rows.push(`<div>peer ${c.short} · ${c.alias}${c.spk ? " · signs" : ""}</div>`);
   }
   sList.innerHTML = rows.length ? rows.join("") : "<div>none yet</div>";
 }
@@ -562,7 +581,7 @@ $("s-new").onclick = async () => {
   db.signets = db.signets || {};
   db.signets[name.toLowerCase()] = rec;
   persist(db);
-  $("s-out").textContent = `S1+PK.${name.replace(/\./g, "_")}.${rec.short}.${rec.pk}`;
+  $("s-out").textContent = announcement(rec) + (rec.spk ? "" : "\n# this browser has no Ed25519: no S2S signing");
   refreshLists();
 };
 
@@ -570,21 +589,29 @@ $("s-pub").onclick = () => {
   const db = store();
   const signets = Object.values(db.signets || {});
   if (!signets.length) { $("s-out").innerHTML = '<span class="bad">Forge a signet first.</span>'; return; }
-  $("s-out").textContent = signets.map(s => `S1+PK.${s.name.replace(/\./g, "_")}.${s.short}.${s.pk}`).join("\n");
+  $("s-out").textContent = signets.map(announcement).join("\n");
 };
 
 $("ct-add").onclick = async () => {
   const alias = $("ct-name").value.trim();
   const ann = $("ct-ann").value.trim();
-  if (!alias || !ann.startsWith("S1+PK.")) {
-    $("s-out").innerHTML = '<span class="bad">Need an alias and an S1+PK announcement.</span>';
+  if (!alias || !(ann.startsWith("S1+PK.") || ann.startsWith("S2+PK."))) {
+    $("s-out").innerHTML = '<span class="bad">Need an alias and an S2+PK or S1+PK announcement.</span>';
     return;
   }
   const parts = ann.split(".");
-  if (parts.length < 4) { $("s-out").innerHTML = '<span class="bad">Malformed announcement.</span>'; return; }
+  const v2 = ann.startsWith("S2+PK.");
+  let ok = parts.length === (v2 ? 5 : 4);
+  try {
+    const pk = b64d(parts[3]);
+    ok = ok && pk.length === 33 && shortId(await sha256(pk)) === parts[2];
+    if (v2) ok = ok && b64d(parts[4]).length === 32;
+  } catch (e) { ok = false; }
+  if (!ok) { $("s-out").innerHTML = '<span class="bad">Malformed announcement.</span>'; return; }
   const db = store();
   db.contacts = db.contacts || {};
   const entry = { alias, name: parts[1], short: parts[2], pk: parts[3] };
+  if (v2) entry.spk = parts[4];
   db.contacts[alias.toLowerCase()] = entry;
   db.contacts[entry.short] = entry;
   persist(db);
@@ -611,6 +638,18 @@ $("seal-btn").onclick = async () => {
       const lines = wire === "S2"
         ? await SIGIL_S2.sealCircle(rec.name, rec.pass, text, { compact, sender })
         : await sealCircle(rec.name, rec.pass, text, compact);
+      out.textContent = lines.join("\n");
+      return;
+    }
+    if (mode === "S") {
+      if (wire !== "S2" || !window.SIGIL_S2) throw new Error("Signed circle needs the S2 wire format.");
+      const db = store();
+      const rec = (db.circles || {})[target.toLowerCase()] || Object.values(db.circles || {}).find(c => c.slug === target || c.name.toLowerCase() === target.toLowerCase());
+      if (!rec) throw new Error("Unknown circle. Save it in the Circle tab.");
+      const signet = Object.values(db.signets || {}).find(s => s.spk);
+      if (!signet) throw new Error("Forge a signet with a signing key first (Signet tab).");
+      const lines = await SIGIL_S2.sealCircleSigned(rec.name, rec.pass, text,
+        { spk: signet.spk, sign: await importLocalSign(signet) }, { compact, sender });
       out.textContent = lines.join("\n");
       return;
     }
@@ -643,7 +682,7 @@ $("open-btn").onclick = async () => {
   const raw = $("open-text").value.trim();
   const out = $("open-out");
   const db = store();
-  const lines = raw.replace(/,/g, " ").split(/\s+/).filter(t => t.startsWith("S1") || /^S2[CKE]\./.test(t));
+  const lines = raw.replace(/,/g, " ").split(/\s+/).filter(t => t.startsWith("S1") || /^S2[CKES]\./.test(t));
   if (!lines.length) { out.innerHTML = '<span class="bad">No SIGIL token found.</span>'; return; }
   const msgs = [];
   const s2results = [];
@@ -690,7 +729,10 @@ $("open-btn").onclick = async () => {
       msgs.push(`failed ${slug}: ${e.message}`);
     }
   }
-  if (s2results.length) for (const m of SIGIL_S2.group(s2results)) msgs.push(formatS2(m));
+  if (s2results.length) {
+    const grouped = await SIGIL_S2.verifySigned(SIGIL_S2.group(s2results), signingKeys(db));
+    for (const m of grouped) msgs.push(formatS2(m));
+  }
   out.textContent = msgs.join("\n\n");
 };
 
@@ -708,7 +750,21 @@ async function s2Keyring(db) {
   };
 }
 
+function signingKeys(db) {
+  const keys = [];
+  for (const s of Object.values(db.signets || {})) if (s.spk) keys.push({ name: s.name, spk: s.spk });
+  for (const c of Object.values(db.contacts || {})) if (c.spk) keys.push({ name: c.alias, spk: c.spk });
+  return keys;
+}
+
 function formatS2(m) {
+  if (m.mode === "signed") {
+    // Never show text from an unverified signed message.
+    if (!m.complete) return `[S2S circle ${m.circle} · incomplete: missing part(s) ${m.missing.join(", ")} of ${m.total} · not shown]`;
+    if (!m.verified) return `[S2S circle ${m.circle} · NOT SHOWN: ${m.error}]`;
+    const snd = m.sender ? ` · sender field ${m.sender}` : "";
+    return `[S2S circle ${m.circle} · signed by ${m.signer} (key ${m.signerFp.slice(0, 16)}…)${snd}]\n${m.text}`;
+  }
   const head = m.mode === "circle" ? `circle ${m.circle}` : m.mode === "signet" ? `signet ${m.from} -> ${m.to}` : `ephemeral -> ${m.to}`;
   const note = m.mode === "circle" ? " (circle member claim)" : m.mode === "ephemeral" ? " (unverified claim)" : "";
   const snd = m.sender ? ` · sender ${m.sender}${note}` : "";
@@ -736,6 +792,19 @@ $("selftest-btn") && ($("selftest-btn").onclick = async () => {
       const got = SIGIL_S2.group(await Promise.all(s2lines.map(l => SIGIL_S2.openToken(l, ring))));
       if (got.length !== 1 || !got[0].complete || got[0].text !== long || got[0].sender !== "Steve") throw new Error("S2 round-trip mismatch");
       s2tok = `${s2lines.length} S2 parts rejoined exactly\n${s2lines[0]}`;
+      try {
+        const kp = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+        const spk = b64e(new Uint8Array(await crypto.subtle.exportKey("raw", kp.publicKey)));
+        const sl = await SIGIL_S2.sealCircleSigned(name, pass, long, { spk, sign: kp.privateKey }, { compact: true });
+        const sg = await SIGIL_S2.verifySigned(SIGIL_S2.group(await Promise.all(sl.map(l => SIGIL_S2.openToken(l, ring)))), [{ name: "me", spk }]);
+        if (sg.length !== 1 || !sg[0].verified || sg[0].text !== long) throw new Error("S2S round-trip mismatch");
+        const none = await SIGIL_S2.verifySigned(SIGIL_S2.group(await Promise.all(sl.map(l => SIGIL_S2.openToken(l, ring)))), []);
+        if (none[0].verified || none[0].text !== null) throw new Error("S2S shown without a key");
+        s2tok += `\n${sl.length} S2S parts, signature verified`;
+      } catch (e) {
+        if (/S2S/.test(e.message)) throw e;
+        s2tok += "\n(S2S skipped: no Ed25519 in this browser)";
+      }
     }
     out.textContent = "selftest ok\n" + tok + "\n" + s2tok;
   } catch (e) {

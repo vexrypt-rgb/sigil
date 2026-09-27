@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.5.0
+
+- **S2S signed circle messages** (`S2S.<slug>.<blob>`): S2C confidentiality plus an
+  Ed25519 (RFC 8032) signature by the sender's signet over the whole message: every part's
+  header and plaintext, the part count, the message id and the circle. The last part ends with
+  a 72-byte trailer (`keyid(8) || sig(64)`). The sealer adds a trailer-only part if the text
+  fills the last line. One line carries 84 B in chat and 67 B in a 234-char whisper
+  (S2C: 156 / 139). A message costs at most one extra line. Spec: README "S2S: signed circle
+  messages".
+- Signets get an Ed25519 signing key (`sign_pk`, `sign_sk_pem`). They announce
+  `S2+PK.<name>.<short>.<pk33>.<spk32>`. `S1+PK` is still accepted. `sigil signet upgrade NAME`
+  adds a signing key to an older signet. `sigil fingerprint` prints P-256 and Ed25519
+  fingerprints (`base64url(SHA-256(key))`).
+- `sigil seal -c CIRCLE --sign [--from-signet NAME]`. `sigil open` shows an S2S message only
+  after its signature verifies against one of your signets or contacts. Unverified or
+  incomplete S2S messages are reported on stderr, and their text is never printed.
+- Browser (`sigil.html`, `sigil_s2.js`): forge signets with Ed25519 where WebCrypto supports it,
+  accept `S2+PK`, seal "Signed circle", verify S2S on open. Selftest includes S2S.
+- Vectors: `tests/vectors/s2k.json` and `tests/vectors/s2s.json` with **public test-only
+  DO-NOT-USE** deterministic signets (alice/bob/carol/mallory). They are byte-exact, including
+  the signatures. Tests: `tests/test_s2s.py`, `tests/test_signed_vectors.py`, S2S interop in
+  `tests/test_js_interop.py`. `tools/capacity.py` measures S2S.
+- S2C, S2K, S2E and S1 are unchanged on the wire.
+
 ## 0.4.0
 
 - **S2 wire format** (`S2C` / `S2K` / `S2E`), now the default for `sigil seal` and the browser

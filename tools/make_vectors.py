@@ -3,6 +3,8 @@
 Generate SIGIL cross-language test vectors:
   tests/vectors/s1c.json  S1C circle messages
   tests/vectors/s2c.json  S2C circle messages (S2 frame header, message id, sender)
+  tests/vectors/s2k.json  S2K signet messages (P-256 ECDH), public test signets
+  tests/vectors/s2s.json  S2S signed circle messages (Ed25519), public test signets
 
 PUBLIC TEST-ONLY KEY MATERIAL. The passphrases below are published on
 purpose so other implementations (Java, JS, ...) can check themselves
@@ -32,9 +34,10 @@ Usage:
   python3 tools/make_vectors.py --suite s2c     # rewrite only s2c.json
   python3 tools/make_vectors.py --suite s1c --stdout   # print instead
 
-S2 vectors are circle-only on purpose: S2K/S2E vectors would need a private
-key in the repo. Those modes are covered by round-trip tests and by the live
-Python<->JS interop test with keys generated at test time.
+S2K and S2S vectors use public TEST-ONLY signets whose private keys are
+derived from public labels ("sigil-public-test-signet-<name>-...-DO-NOT-USE").
+They are published on purpose, like RFC test vectors, and are not keys.
+S2E is covered by round-trip tests and the live Python<->JS interop test.
 """
 
 from __future__ import annotations
@@ -50,6 +53,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "tests" / "vectors" / "s1c.json"
 OUT2 = ROOT / "tests" / "vectors" / "s2c.json"
+OUT_K = ROOT / "tests" / "vectors" / "s2k.json"
+OUT_S = ROOT / "tests" / "vectors" / "s2s.json"
 
 # Must be set before sigil is imported: sigil reads SIGIL_HOME at import time.
 _TMP = tempfile.TemporaryDirectory(prefix="sigil-vectors-")
@@ -596,10 +601,422 @@ def build_s2() -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Test signets (S2K and S2S). PUBLIC TEST-ONLY KEY MATERIAL, derived from a
+# public label so anyone can re-derive them. They are NOT keys.
+# ---------------------------------------------------------------------------
+
+from cryptography.hazmat.primitives import serialization as _ser  # noqa: E402
+from cryptography.hazmat.primitives.asymmetric import ec as _ec, ed25519 as _ed  # noqa: E402
+
+P256_ORDER = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
+SIGNET_WARNING = (
+    "PUBLIC TEST-ONLY KEY MATERIAL. These signet private keys (P-256 and Ed25519) are derived from public "
+    "labels ('sigil-public-test-signet-<name>-...-DO-NOT-USE') and published on purpose for cross-implementation "
+    "testing. They are NOT keys. Never use them for real messages. Circle passphrases likewise."
+)
+TEST_SIGNET_NAMES = {"alice": "Alice", "bob": "Bob", "carol": "Carol", "mallory": "Mallory"}
+
+
+def _b64u_int(n: int) -> str:
+    return sigil.b64e(n.to_bytes(32, "big"))
+
+
+def test_signet(sid: str) -> dict:
+    label = f"sigil-public-test-signet-{sid}-DO-NOT-USE"
+    d = int.from_bytes(hashlib.sha256((label + "-p256").encode()).digest(), "big") % (P256_ORDER - 1) + 1
+    sk = _ec.derive_private_key(d, _ec.SECP256R1())
+    seed = hashlib.sha256((label + "-ed25519").encode()).digest()
+    ssk = _ed.Ed25519PrivateKey.from_private_bytes(seed)
+    rec = sigil.signet_record(TEST_SIGNET_NAMES[sid], sk, ssk)
+    rec["created"] = "2026-09-27T00:00:00Z"
+    nums = sk.public_key().public_numbers()
+    spk = sigil.b64d(rec["sign_pk"])
+    return {
+        "id": sid,
+        "label": label,
+        "record": rec,  # exactly what `sigil signet new` writes to signet-*.json (fixed created date)
+        "name": rec["name"],
+        "short": rec["short"],
+        "pk": rec["pk"],
+        "fingerprint": sigil.fingerprint(sigil.b64d(rec["pk"])),
+        "sk_hex": d.to_bytes(32, "big").hex(),
+        "jwk": {"kty": "EC", "crv": "P-256", "x": _b64u_int(nums.x), "y": _b64u_int(nums.y),
+                "d": _b64u_int(d)},
+        "sign_pk": rec["sign_pk"],
+        "sign_short": rec["sign_short"],
+        "sign_fingerprint": sigil.fingerprint(spk),
+        "sign_keyid_hex": sigil.s2s_keyid(spk).hex(),
+        "sign_seed_hex": seed.hex(),
+        "sign_jwk": {"kty": "OKP", "crv": "Ed25519", "x": rec["sign_pk"], "d": sigil.b64e(seed)},
+        "announcement": sigil.announce_signet(rec),
+    }
+
+
+def use_signets(signets: dict, own: list[str], contacts: list[str], circles: dict = None,
+                circle_ids: list[str] = ()) -> None:
+    """Temporary keyring = exactly these own signets, contacts (with signing keys) and circles."""
+    home = Path(_TMP.name)
+    for pat in ("signet-*.json", "contacts.json", "circle-*.json"):
+        for f in home.glob(pat):
+            f.unlink()
+    for sid in own:
+        sigil.save_json(sigil.signet_path(signets[sid]["name"]), signets[sid]["record"])
+    for sid in contacts:
+        s = signets[sid]
+        sigil.remember_contact(s["name"], s["pk"], s["name"], s["sign_pk"])
+    for cid in circle_ids:
+        c = circles[cid]
+        sigil.circle_create(c["name"], c["passphrase"], note="public test vector - not a key")
+
+
+# ------------------------------------------------------------------- S2K
+
+def s2k_direction(signets: dict, frm: str, to: str) -> dict:
+    a, b = signets[frm], signets[to]
+    sk = sigil._sk_from_pem(a["record"]["sk_pem"])
+    pk = sigil._pk_from_b64(b["pk"])
+    ctx = sigil.s2_context("K", a["short"], b["short"])
+    info = ctx + sigil.b64d(a["pk"]) + sigil.b64d(b["pk"])
+    shared = sk.exchange(_ec.ECDH(), pk)
+    return {"from": frm, "to": to, "ctx": ctx.decode(), "ecdh_x_hex": shared.hex(), "info_hex": info.hex(),
+            "key_hex": sigil.ecdh_key(sk, pk, info).hex()}
+
+
+def s2k_positive(vid, signets, frm, to, plaintext, *, compact=False, max_line=256, sender="", note="",
+                 opener=None):
+    opener = opener or {"own": [to], "contacts": [frm]}
+    use_signets(signets, [frm], [to])
+    lines = sigil.seal_to_signet_s2(signets[frm]["record"], sigil.find_contact(signets[to]["name"]), plaintext,
+                                    max_line=max_line, compact=compact, sender=sender)
+    d = s2k_direction(signets, frm, to)
+    key = bytes.fromhex(d["key_hex"])
+    ctx = d["ctx"].encode()
+    use_signets(signets, opener["own"], opener["contacts"])
+    parts = []
+    for tok in lines:
+        fr = sigil.s2_parse_frame(sigil.b64d(tok.rsplit(".", 1)[1]))
+        aad = fr["header"] + ctx
+        payload = AESGCM(key).decrypt(fr["nonce"], fr["ct"], aad)
+        got = sigil.open_line(tok)
+        parts.append({"token": tok, "index": fr["index"], "total": fr["total"], "flags": fr["flags"],
+                      "codebook": bool(fr["flags"] & sigil.S2_Z), "join": bool(fr["flags"] & sigil.S2_J),
+                      "sender": got["sender"], "from": got["from"], "header_hex": fr["header"].hex(),
+                      "mid_hex": fr["mid"].hex(), "nonce_hex": fr["nonce"].hex(), "aad_hex": aad.hex(),
+                      "payload_hex": payload.hex(), "plaintext": got["plaintext"]})
+    joined = sigil.stitch_parts([(p["plaintext"], p["codebook"], p["join"]) for p in parts])
+    return {"id": vid, "from": frm, "to": to, "opener": opener,
+            "seal": {"compact": compact, "max_line": max_line, "sender": sender},
+            "plaintext": plaintext, "lines": lines, "parts": parts, "joined": joined,
+            "joined_equals_plaintext": joined == plaintext, "note": note}
+
+
+def build_s2k() -> dict:
+    signets = {sid: test_signet(sid) for sid in TEST_SIGNET_NAMES}
+    use_signets(signets, ["alice"], ["bob"])
+    lo, hi = 0, 400
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        n = len(sigil.seal_to_signet_s2(signets["alice"]["record"], sigil.find_contact("Bob"), "a" * mid))
+        lo, hi = (mid, hi) if n == 1 else (lo, mid - 1)
+    single_max = lo
+    pos = [
+        s2k_positive("plain-short", signets, "alice", "bob", "portal at 1847 12 -320",
+                     note="Alice -> Bob, raw, one line."),
+        s2k_positive("reverse-direction", signets, "bob", "alice", "portal at 1847 12 -320",
+                     note="Bob -> Alice uses a different key (ctx and info order are directional)."),
+        s2k_positive("plain-empty", signets, "alice", "bob", "", note="Empty plaintext."),
+        s2k_positive("plain-single-line-max", signets, "alice", "bob", "a" * single_max,
+                     note=f"Longest ASCII run ({single_max} B) in one S2K line at max_line=256."),
+        s2k_positive("plain-first-split", signets, "alice", "bob", "a" * (single_max + 1),
+                     note="One byte more: two parts with part byte + message id."),
+        s2k_positive("whisper-budget", signets, "alice", "bob", "b" * 136, max_line=234,
+                     note="136 B = one S2K line in a /msg whisper budget (max_line=234)."),
+        s2k_positive("plain-multipart-3", signets, "alice", "bob", "abcdefghij" * 40, note="Three raw parts."),
+        s2k_positive("unicode-mixed", signets, "alice", "bob", "Grüße 🧭 北 -320 / ñ / שלום / e\u0301",
+                     note="Multi-byte UTF-8."),
+        s2k_positive("compact-z", signets, "alice", "bob", "nether roof stash at 0 128 0", compact=True,
+                     note="Codebook v2 body."),
+        s2k_positive("sender-field", signets, "alice", "bob", "who sent this", sender="Alice",
+                     note="Sealed sender name. The authenticated identity is the route's from key (Alice), "
+                          "not this field."),
+        s2k_positive("sender-claim-not-identity", signets, "mallory", "bob", "I am Alice", sender="Alice",
+                     opener={"own": ["bob"], "contacts": ["alice", "mallory"]},
+                     note="Mallory (a known contact) claims sender 'Alice'. It opens, but 'from' is Mallory: "
+                          "only the key proves the sender."),
+    ]
+    short = pos[0]["lines"][0]
+    multi = pos[6]["lines"]
+    a, b, m, c = (signets[x]["short"] for x in ("alice", "bob", "mallory", "carol"))
+    # Mallory seals to Bob with her own key but writes Alice's short id as the sender.
+    use_signets(signets, ["mallory"], ["bob"])
+    mal = sigil.seal_to_signet_s2(signets["mallory"]["record"], sigil.find_contact("Bob"), "trust me, I am Alice")[0]
+    forged_route = mal.replace(f"S2K.{b}.{m}.", f"S2K.{b}.{a}.", 1)
+    use_signets(signets, ["alice"], ["carol"])
+    to_carol = sigil.seal_to_signet_s2(signets["alice"]["record"], sigil.find_contact("Carol"), "for carol only")[0]
+    blob_len = len(sigil.b64d(short.rsplit(".", 1)[1]))
+    std = {"own": ["bob"], "contacts": ["alice"]}
+    neg = [
+        {"id": "tampered-tag", "line": s2_edit(short, lambda d: d.__setitem__(blob_len - 1, d[blob_len - 1] ^ 1)),
+         "opener": std, "reason": "Last tag byte flipped."},
+        {"id": "tampered-header", "line": s2_edit(short, lambda d: d.__setitem__(0, d[0] ^ sigil.S2_S)),
+         "opener": std, "reason": "S flag set: header is in the AAD."},
+        {"id": "impersonation-route-relabelled", "line": forged_route, "opener": std,
+         "reason": "Mallory seals with her own key and writes Alice's short id as sender. Bob derives the key "
+                   "from Alice's public key, so the tag fails."},
+        {"id": "impersonation-unknown-sender", "line": mal, "opener": std,
+         "reason": "Mallory's own honest token: Bob has no contact with her short id."},
+        {"id": "reflection", "line": short.replace(f"S2K.{b}.{a}.", f"S2K.{a}.{b}.", 1),
+         "opener": {"own": ["alice"], "contacts": ["bob"]},
+         "reason": "Alice->Bob token reflected back to Alice as if Bob sent it: the direction key differs."},
+        {"id": "wrong-recipient", "line": to_carol.replace(f"S2K.{c}.", f"S2K.{b}.", 1), "opener": std,
+         "reason": "Alice->Carol token relabelled to Bob."},
+        {"id": "not-for-me", "line": to_carol, "opener": std,
+         "reason": "Addressed to Carol's short id; Bob holds no such signet."},
+        {"id": "fragment-relabelled", "line": s2_edit(multi[0], lambda d: d.__setitem__(1, (1 << 4) | 2)),
+         "opener": std, "reason": "Part 1/3 relabelled 2/3."},
+        {"id": "truncated", "line": f"S2K.{b}.{a}.{sigil.b64e(bytes(20))}", "opener": std,
+         "reason": "Frame shorter than header + nonce + tag."},
+    ]
+    return {
+        "format": "sigil-test-vectors", "format_version": 1, "WARNING": SIGNET_WARNING,
+        "suite": "S2K signet messages (static-static P-256 ECDH)", "protocol": sigil.VERSION2,
+        "aad_prefix": sigil.PROTOCOL2, "sigil_version": sigil.__version__,
+        "generator": "tools/make_vectors.py --suite s2k (records real sigil.seal_to_signet_s2 output; "
+                     "random nonces/ids; deterministic public test keys)",
+        "lexicon_v2_sha256": sigil.lexicon_hash(),
+        "key": {
+            "ctx": "UTF-8('SIGIL.v2.K.' + from_short + '.' + to_short)",
+            "ikm": "ECDH-P256(from_sk, to_pk): 32-byte x coordinate",
+            "hkdf": "HKDF-SHA256(ikm, salt=none (32 zero bytes), info = ctx || from_pk33 || to_pk33, L=32)",
+            "aad": "header || ctx", "token": "S2K.<to_short>.<from_short>.<blob>",
+            "short": "b64url(SHA-256(pk33))[0:4].lower()", "fingerprint": "b64url(SHA-256(pk33)) (43 chars)",
+        },
+        "fields": {
+            "signets[]": "public test signets; record = sigil keyring JSON; jwk/sk_hex = same P-256 key",
+            "directions[]": "ctx, ECDH x, HKDF info and resulting AES key per direction",
+            "positive[].opener": "which signets the opener owns and which contacts it holds",
+            "positive[].parts[].from": "contact name sigil reports as the proven sender",
+            "negative[]": "every line must FAIL to open with the given opener keyring",
+        },
+        "signets": list(signets.values()),
+        "directions": [s2k_direction(signets, "alice", "bob"), s2k_direction(signets, "bob", "alice"),
+                       s2k_direction(signets, "mallory", "bob")],
+        "positive": pos, "negative": neg,
+    }
+
+
+# ------------------------------------------------------------------- S2S
+
+def s2s_positive(vid, circles, signets, signer, plaintext, *, compact=False, max_line=256, sender="",
+                 note="", verifier_keys=None, expect_signer=None):
+    circle = circles["main"]
+    verifier_keys = verifier_keys or ["alice", "bob"]
+    lines = sigil.seal_circle_signed_s2(_record_for(circle), signets[signer]["record"], plaintext,
+                                        sender=sender, max_line=max_line, compact=compact)
+    use_signets(signets, [], verifier_keys, circles, ["main"])
+    key = bytes.fromhex(circle["key_hex"])
+    ctx = sigil.s2_context("S", circle["name"])
+    opened = [sigil.open_line(t) for t in lines]
+    parts = []
+    for tok, r in zip(lines, opened):
+        fr = sigil.s2_parse_frame(sigil.b64d(tok.rsplit(".", 1)[1]))
+        aad = fr["header"] + ctx
+        full = AESGCM(key).decrypt(fr["nonce"], fr["ct"], aad)
+        parts.append({"token": tok, "index": fr["index"], "total": fr["total"], "flags": fr["flags"],
+                      "codebook": bool(fr["flags"] & sigil.S2_Z), "join": bool(fr["flags"] & sigil.S2_J),
+                      "sender": r["sender"], "header_hex": fr["header"].hex(), "mid_hex": fr["mid"].hex(),
+                      "nonce_hex": fr["nonce"].hex(), "aad_hex": aad.hex(), "payload_hex": r["payload_hex"],
+                      "sealed_plaintext_hex": full.hex(), "plaintext": r["plaintext"]})
+    msgs = sigil.assemble_messages(opened)
+    assert len(msgs) == 1 and msgs[0]["verified"], msgs
+    tbs = sigil.s2s_signed_bytes(ctx, bytes.fromhex(opened[-1]["keyid"]),
+                                 [(bytes.fromhex(p["header_hex"]), bytes.fromhex(p["payload_hex"])) for p in parts])
+    return {"id": vid, "circle": "main", "signer": signer, "verifier_keys": verifier_keys,
+            "seal": {"compact": compact, "max_line": max_line, "sender": sender},
+            "plaintext": plaintext, "lines": lines, "parts": parts,
+            "keyid_hex": opened[-1]["keyid"], "sig_hex": opened[-1]["sig_hex"], "signed_bytes_hex": tbs.hex(),
+            "joined": msgs[0]["text"], "expect": {"verified": True, "signer": signets[expect_signer or signer]["name"]},
+            "note": note}
+
+
+def _reseal_s2s(circle: dict, token: str, fn) -> str:
+    """What a circle member (who holds the circle key but not the signer's key) can do: decrypt, edit, re-seal."""
+    key = bytes.fromhex(circle["key_hex"])
+    ctx = sigil.s2_context("S", circle["name"])
+    head, blob = token.rsplit(".", 1)
+    fr = sigil.s2_parse_frame(sigil.b64d(blob))
+    pt = bytearray(AESGCM(key).decrypt(fr["nonce"], fr["ct"], fr["header"] + ctx))
+    header = bytearray(fr["header"])
+    fn(header, pt)
+    header, pt = bytes(header), bytes(pt)
+    return f"{head}.{sigil.b64e(header + fr['nonce'] + AESGCM(key).encrypt(fr['nonce'], pt, header + ctx))}"
+
+
+def build_s2s() -> dict:
+    circles = {cid: circle_record(cid) for cid in CIRCLES}
+    signets = {sid: test_signet(sid) for sid in TEST_SIGNET_NAMES}
+    main = circles["main"]
+    rec = _record_for(main)
+    alice = signets["alice"]["record"]
+
+    def single_max(max_line):
+        lo, hi = 0, 400
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            n = len(sigil.seal_circle_signed_s2(rec, alice, "a" * mid, max_line=max_line))
+            lo, hi = (mid, hi) if n == 1 else (lo, mid - 1)
+        return lo
+    smax, smax_w = single_max(256), single_max(234)
+    # Longest 2-part raw message whose trailer still fits in part 2 (next byte adds a signature-only part).
+    room = sigil.s2_payload_room(256, 9, True)
+    two_max = 2 * room - sigil.S2S_TRAILER
+    pos = [
+        s2s_positive("signed-short", circles, signets, "alice", "portal at 1847 12 -320",
+                     note="One line: [body] || keyid(8) || Ed25519 sig(64) inside the ciphertext."),
+        s2s_positive("signed-empty", circles, signets, "alice", "", note="Empty body still signed."),
+        s2s_positive("signed-single-line-max", circles, signets, "alice", "a" * smax,
+                     note=f"Longest ASCII body ({smax} B) that fits one S2S line with its trailer at max_line=256."),
+        s2s_positive("signed-whisper-single-max", circles, signets, "alice", "w" * smax_w, max_line=234,
+                     note=f"Whisper budget (max_line=234): {smax_w} B in one signed line."),
+        s2s_positive("signature-only-part", circles, signets, "alice", "a" * (smax + 1),
+                     note="One byte more than one line: part 1 carries the text, part 2 only the trailer."),
+        s2s_positive("trailer-in-last-part", circles, signets, "alice", "c" * two_max,
+                     note=f"{two_max} B: two parts, the trailer fills the rest of part 2."),
+        s2s_positive("trailer-spills", circles, signets, "alice", "c" * (two_max + 1),
+                     note="One byte more: a third, signature-only part."),
+        s2s_positive("signed-multipart-3", circles, signets, "bob", "abcdefghij" * 40,
+                     note="Several parts; the signature covers every header and part plaintext."),
+        s2s_positive("signed-unicode", circles, signets, "alice", "Grüße 🧭 北 -320 / ñ / שלום / e\u0301",
+                     note="Multi-byte UTF-8."),
+        s2s_positive("signed-compact", circles, signets, "alice", (
+                     ("nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender "
+                      "meet at the ruined portal after dragon ") * 3).strip(), compact=True,
+                     note="Codebook parts: the signature covers the packed bytes."),
+        s2s_positive("signed-sender", circles, signets, "alice", "anon or not", sender="Alice",
+                     note="Sender field in part 1, trailer in the last part."),
+        s2s_positive("sender-claim-vs-signer", circles, signets, "mallory", "I am Alice", sender="Alice",
+                     verifier_keys=["alice", "mallory"],
+                     note="Mallory's key is known and she claims 'Alice': the message verifies, and the signer "
+                          "is Mallory. Trust the signer, not the sender field."),
+    ]
+    one = pos[0]["lines"][0]
+    multi = pos[7]["lines"]
+    sponly = pos[4]["lines"]
+    other = sigil.seal_circle_signed_s2(rec, signets["bob"]["record"], "klmnopqrst" * 40)
+    assert len(other) == len(multi)
+    mal_claims = sigil.seal_circle_signed_s2(rec, signets["mallory"]["record"], "I am Alice", sender="Alice")[0]
+    a_keyid = bytes.fromhex(signets["alice"]["sign_keyid_hex"])
+
+    def flip_sig(h, pt):
+        pt[-1] ^= 1
+
+    def flip_body(h, pt):
+        pt[0] ^= 1
+
+    def put_alice_keyid(h, pt):
+        pt[-sigil.S2S_TRAILER:-sigil.S2S_SIG_LEN] = a_keyid
+
+    def put_mid(mid):
+        def f(h, pt):
+            h[2:2 + sigil.S2_MID_LEN] = mid
+        return f
+
+    mid_a = sigil.s2_parse_frame(sigil.b64d(multi[0].rsplit(".", 1)[1]))["mid"]
+    std = ["alice", "bob"]
+    # Circle member drops the signature part of a 2-part message and relabels part 1 as a single-line frame.
+    def as_single(h, pt):
+        del h[1:]
+        h[0] &= ~sigil.S2_M & 0xFF
+    dropped = _reseal_s2s(main, sponly[0], as_single)
+    msgs = [
+        {"id": "circle-member-flips-signature", "verifier_keys": std, "lines": [_reseal_s2s(main, one, flip_sig)],
+         "expect": {"verified": False, "error": "bad-signature"},
+         "reason": "A circle member re-seals the part with one signature bit flipped."},
+        {"id": "circle-member-edits-body", "verifier_keys": std, "lines": [_reseal_s2s(main, one, flip_body)],
+         "expect": {"verified": False, "error": "bad-signature"},
+         "reason": "A circle member changes the text and re-seals it; the signature no longer matches."},
+        {"id": "impersonation-unknown-key", "verifier_keys": std, "lines": [mal_claims],
+         "expect": {"verified": False, "error": "unknown-signer"},
+         "reason": "Mallory (not a known key) signs and claims sender 'Alice': refused, unknown key id."},
+        {"id": "impersonation-keyid-swapped", "verifier_keys": std,
+         "lines": [_reseal_s2s(main, mal_claims, put_alice_keyid)],
+         "expect": {"verified": False, "error": "bad-signature"},
+         "reason": "Mallory writes Alice's key id next to her own signature: Alice's key does not verify it."},
+        {"id": "splice-other-message-part", "verifier_keys": std,
+         "lines": [multi[0], _reseal_s2s(main, other[1], put_mid(mid_a))] + multi[2:],
+         "expect": {"verified": False, "error": "bad-signature"},
+         "reason": "Part 2 of Bob's other message, re-sealed by a circle member with this message's id: "
+                   "the message assembles, but the signature covers the original part 2."},
+        {"id": "splice-without-rewrite", "verifier_keys": std, "lines": [multi[0], other[1]] + multi[2:],
+         "expect": {"verified": False, "error": "incomplete"},
+         "reason": "Part 2 of another message with a different id: never assembled."},
+        {"id": "signature-part-dropped", "verifier_keys": std, "lines": [dropped],
+         "expect": {"verified": False, "error": "unknown-signer"},
+         "reason": "Signature-only part dropped by a circle member, part 1 relabelled as a single-line frame: its "
+                   "last 72 body bytes are read as keyid || sig, match no known key id, and nothing is shown."},
+        {"id": "missing-part", "verifier_keys": std, "lines": [multi[0], multi[-1]],
+         "expect": {"verified": False, "error": "incomplete"}, "reason": "A part is missing: nothing is verified."},
+        {"id": "no-verifier-keys", "verifier_keys": [], "lines": [one],
+         "expect": {"verified": False, "error": "unknown-signer"},
+         "reason": "The opener holds the circle but no signing keys: the message is not attributed or shown."},
+        {"id": "duplicate-part-ignored", "verifier_keys": std, "lines": [multi[0], multi[0]] + multi[1:],
+         "expect": {"verified": True, "signer": "Bob"}, "reason": "A replayed part is ignored."},
+    ]
+    blob_len = len(sigil.b64d(one.rsplit(".", 1)[1]))
+    slug = main["slug"]
+    wrongpass = sigil.seal_circle_signed_s2(_record_for(circles["wrongpass"]), alice, "wrong circle key")[0]
+    neg = [
+        {"id": "tampered-tag", "line": s2_edit(one, lambda d: d.__setitem__(blob_len - 1, d[blob_len - 1] ^ 1)),
+         "reason": "GCM tag flipped (outsider)."},
+        {"id": "s2s-presented-as-s2c", "line": one.replace("S2S.", "S2C.", 1),
+         "reason": "Different ctx ('SIGIL.v2.C.' vs 'SIGIL.v2.S.'): a signed token never opens as a circle token."},
+        {"id": "s2c-presented-as-s2s",
+         "line": sigil.seal_circle_s2(rec, "unsigned circle message")[0].replace("S2C.", "S2S.", 1),
+         "reason": "An unsigned S2C token relabelled S2S does not open."},
+        {"id": "wrong-passphrase", "line": wrongpass, "reason": "Signed under another circle key."},
+        {"id": "short-trailer", "line": _reseal_s2s(main, one, lambda h, pt: pt.__delitem__(slice(0, len(pt)))),
+         "reason": "Last part with fewer than 72 plaintext bytes: rejected on open."},
+        {"id": "slug-unknown", "line": one.replace(f"S2S.{slug}.", "S2S.qqqq.", 1), "reason": "No circle."},
+    ]
+    return {
+        "format": "sigil-test-vectors", "format_version": 1, "WARNING": SIGNET_WARNING,
+        "suite": "S2S signed circle messages (Ed25519)", "protocol": sigil.VERSION2, "aad_prefix": sigil.PROTOCOL2,
+        "sigil_version": sigil.__version__,
+        "generator": "tools/make_vectors.py --suite s2s (records real sigil.seal_circle_signed_s2 output; random "
+                     "nonces/ids; Ed25519 signatures are deterministic)",
+        "lexicon_v2_sha256": sigil.lexicon_hash(),
+        "seal": {
+            "token": "S2S.<slug>.<blob>", "key": "circle key (as S2C)", "ctx": "UTF-8('SIGIL.v2.S.' + name)",
+            "aad": "header || ctx",
+            "plaintext": "as S2C; the LAST part additionally ends with keyid(8) || sig(64)",
+            "keyid": "SHA-256(Ed25519 public key)[0:8]",
+            "signed_bytes": "'SIGIL.v2.sig' 0x00 || u16(len ctx) ctx || keyid || u8(n) || for each part: "
+                            "u8(len header) header || u16(len pt) pt   (pt without the trailer; big-endian)",
+            "sig": "Ed25519 (RFC 8032, pure) over signed_bytes",
+            "sealer_policy": "trailer goes into the last text part when it fits, else into an extra part with an "
+                             "empty raw body",
+        },
+        "fields": {
+            "signets[]": "public test signets (see s2k.json); sign_seed_hex / sign_jwk = Ed25519 private key",
+            "positive[].verifier_keys": "signing public keys the opener holds",
+            "positive[].parts[].payload_hex": "part plaintext without the trailer (what the signature covers)",
+            "positive[].parts[].sealed_plaintext_hex": "exact bytes that went into AES-GCM (with trailer)",
+            "positive[].signed_bytes_hex / sig_hex": "exact Ed25519 input and signature (deterministic)",
+            "messages[]": "open + assemble + verify: expect.verified and expect.error "
+                          "(bad-signature | unknown-signer | incomplete)",
+            "negative[]": "every line must FAIL to open",
+        },
+        "circles": list(circles.values()),
+        "signets": list(signets.values()),
+        "positive": pos, "negative": neg, "messages": msgs,
+    }
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--stdout", action="store_true")
-    ap.add_argument("--suite", choices=["s1c", "s2c", "all"], default="all")
+    ap.add_argument("--suite", choices=["s1c", "s2c", "s2k", "s2s", "all"], default="all")
     args = ap.parse_args()
     jobs = []
     try:
@@ -607,6 +1024,10 @@ def main() -> None:
             jobs.append((OUT, build()))
         if args.suite in ("s2c", "all"):
             jobs.append((OUT2, build_s2()))
+        if args.suite in ("s2k", "all"):
+            jobs.append((OUT_K, build_s2k()))
+        if args.suite in ("s2s", "all"):
+            jobs.append((OUT_S, build_s2s()))
     finally:
         _TMP.cleanup()
     for out, data in jobs:

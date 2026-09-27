@@ -1,11 +1,11 @@
 # SIGIL tests and cross-language vectors
 
 ```
-python3 sigil.py selftest                     # round-trip smoke test (S1 + S2)
-python3 -m unittest discover -s tests -v      # vectors, S2 round-trip/tamper, JS interop (needs node)
-python3 tools/make_vectors.py --suite s2c     # regenerates tests/vectors/s2c.json (s1c | s2c | all)
-node tests/js/sigil_node.cjs selftest         # browser S2 code under Node
-node tests/js/sigil_node.cjs vectors tests/vectors/s2c.json
+python3 sigil.py selftest                     # round-trip smoke test (S1 + S2 incl. S2S)
+python3 -m unittest discover -s tests -v      # vectors, S2/S2S round-trip/tamper, JS interop (needs node)
+python3 tools/make_vectors.py --suite s2s     # regenerates a vector file (s1c | s2c | s2k | s2s | all)
+node tests/js/sigil_node.cjs selftest         # browser S2 code under Node (Node 20+: Ed25519 in WebCrypto)
+node tests/js/sigil_node.cjs vectors tests/vectors/s2c.json   # also s2k.json, s2s.json
 ```
 
 | File | What |
@@ -13,7 +13,9 @@ node tests/js/sigil_node.cjs vectors tests/vectors/s2c.json
 | `test_vectors.py` | `vectors/s1c.json` and `vectors/s2c.json` |
 | `test_open_stitch.py` | S1 `sigil open` stitching (raw exact, codebook heuristic) |
 | `test_s2.py` | S2 C/K/E: 1/2/3+ parts, exact capacity, unicode, compact exact incl. mid-word cuts, sender, 16-part limit, sender/flag/`i/n` tamper, cross-message splice, S1 compatibility, CLI `--wire` |
-| `test_js_interop.py` | Python seals → `sigil_s2.js` opens, and back, for C/K/E. Keys are generated per run and passed on stdin. Skipped without `node` |
+| `test_signed_vectors.py` | `vectors/s2k.json` and `vectors/s2s.json`: open, verify, re-derive keys / signed bytes / signatures, re-seal byte-exact, negatives |
+| `test_s2s.py` | S2S: round-trip (1/2/3+ parts, compact, unicode, sender), trailer placement, tamper (every bit of a message), circle-member edits, impersonation (unknown key, swapped key id, claimed sender), splice across messages, cross-circle, signet upgrade / `S2+PK`, CLI `--sign` / `open` never prints unverified text |
+| `test_js_interop.py` | Python seals → `sigil_s2.js` opens, and back, for C/K/E and S2S (incl. an unknown signer that must not be shown). Runs all S2 vector files through the JS. Keys are generated per run and passed on stdin. Skipped without `node` |
 
 ## `vectors/s1c.json`: S1C circle vectors
 
@@ -70,5 +72,45 @@ header flag flipped (S, Z both ways, J, reserved), `J` on the last part, the par
 relabelled, a fragment rewritten as a single-line frame, another message's id written into a
 part, wrong passphrase/name, an S1 blob presented as S2, an unknown slug and a truncated frame.
 
-There are no S2K/S2E vectors, because they would need a private key committed to the repo.
-Those modes are covered by `test_s2.py` and by `test_js_interop.py` with keys made at test time.
+## Public test signets (`s2k.json`, `s2s.json`)
+
+> **PUBLIC TEST-ONLY PRIVATE KEYS. DO NOT USE.** Both files publish full private keys for four
+> signets (`alice`, `bob`, `carol`, `mallory`) so other implementations can check byte-exact
+> output. They are derived deterministically from the labels
+> `sigil-public-test-signet-<id>-DO-NOT-USE`:
+>
+> - P-256 `d = SHA-256(label || "-p256") mod (n - 1) + 1`
+> - Ed25519 seed `= SHA-256(label || "-ed25519")`
+>
+> Anyone can recompute them. A message signed by one of them proves nothing.
+
+Each signet entry has the stored record (`sk_pem`, `sign_sk_pem`, …), `sk_hex`, a P-256 JWK, the
+Ed25519 seed and JWK, fingerprints, the S2S key id and the `S2+PK` announcement.
+
+## `vectors/s2k.json`: S2K directed vectors
+
+`directions[]` records, per direction, the context, the ECDH x-coordinate, the HKDF info and the
+derived key. Positive vectors name `from`, `to` and an `opener` (own signets and contacts). Each part has
+`header_hex`, `nonce_hex`, `aad_hex` and `payload_hex`, so a port can re-seal a part byte-exact.
+Negatives: tampered tag and header, the route relabelled to claim another sender, a sender
+unknown to the opener, reflection (A→B presented as B→A), the wrong recipient, a token not for
+this opener, a relabelled fragment, and a truncated frame.
+
+## `vectors/s2s.json`: S2S signed circle vectors
+
+Positive vectors record `signed_bytes_hex`, `keyid_hex` and `sig_hex`. Ed25519 is deterministic,
+so a port must reproduce the signature exactly. Per part they record `payload_hex` (without the
+trailer), `sealed_plaintext_hex` (with it), `aad_hex` and `nonce_hex`. Cases: short, empty, the longest single
+line in chat and whisper budgets, a trailer-only extra part, the trailer inside or spilling
+out of the last part, 3 parts, unicode, compact, sender field, and a sender claim that differs
+from the signer.
+
+`messages[]` are message-level checks against the listed `verifier_keys`: a circle member
+flipping the signature or editing the body (`bad-signature`), impersonation with an unknown key
+(`unknown-signer`) or a swapped key id (`bad-signature`), a part spliced in from another message,
+a dropped signature part, a missing part (`incomplete`), no verifier keys, and a duplicate
+part that must be ignored. `negative[]` lines must not open at all (tag flip, S2S↔S2C relabel,
+wrong passphrase, a last part too short for its trailer, unknown slug).
+
+S2E has no vectors (its ephemeral key is random by design). `test_s2.py` and `test_js_interop.py`
+cover it.

@@ -88,6 +88,23 @@ them:  sigil seal --to Steve "don't sell the elytra"
 `S2K` uses both static keys (compact). `S2E` uses a fresh ephemeral
 sender key (forward secrecy, fatter header, less room for plaintext).
 
+### 3. Signed circle — a circle message that proves who wrote it (0.5.0)
+
+Best when a group shares one circle but readers must know *which member*
+spoke (bots in a swarm, a lead giving orders).
+
+```
+you:   sigil signet new Steve          # 0.5.0 signets also hold an Ed25519 signing key
+you:   S2+PK.Steve.r2ab.A6bC....d5wa...  (paste once; older signets: sigil signet upgrade Steve)
+them:  sigil contact add Steve S2+PK.Steve.r2ab....
+you:   sigil seal -c deepcave --sign "lead says: regroup at spawn"
+       S2S.deep.AIyA...
+them:  sigil open S2S.deep.AIyA...     # shown only if Steve's signature verifies
+```
+
+Everyone in the circle can read it. Only the holder of Steve's signing key
+can produce it. See "S2S: signed circle messages" below.
+
 ## Wire format S2 (default since 0.4.0)
 
 S2 keeps the S1 primitives and keys (same circle key, same signets, same
@@ -109,8 +126,8 @@ keyrings) and changes only the framing. It adds four things:
 
 ```
 token      = "S2" mode "." route "." blob
-mode       = "C" | "K" | "E"
-route      = slug                              ; mode C: 4 chars [a-z0-9]
+mode       = "C" | "K" | "E" | "S"             ; S since 0.5.0
+route      = slug                              ; modes C and S: 4 chars [a-z0-9]
            | to_short "." from_short           ; mode K: 4 chars each
            | to_short                          ; mode E
 blob       = base64url, no padding, of frame   ; alphabet A-Z a-z 0-9 - _
@@ -148,6 +165,8 @@ C:  key = PBKDF2-HMAC-SHA256(passphrase,
                              SHA-256("SIGIL.v1.circle.salt." || name)[0:16],
                              210000, 32)                     ; same key as S1
     ctx = "SIGIL.v2.C." || circle_name
+S:  key = the circle key above
+    ctx = "SIGIL.v2.S." || circle_name          ; never valid as C, and vice versa
 K:  ctx = "SIGIL.v2.K." || from_short || "." || to_short
     key = HKDF-SHA256(ikm = ECDH(from_sk, to_pk), salt = none (32 zero bytes),
                       info = ctx || from_pk33 || to_pk33, L = 32)
@@ -181,10 +200,95 @@ In **S2C** the sender name proves only that *someone holding the circle
 passphrase* wrote it. Any circle member can claim any name, and so can a
 former member who kept the passphrase. It stops outsiders and chat relays
 from editing or forging the name. It does not tell circle members apart.
-**S2K (and S1K) is the only mode with real per-sender authentication**:
-the key is bound to the sender's static signet. In **S2E** the name is an
-unverified claim, because anyone with the recipient's public key can seal
-one.
+Two modes give real per-sender authentication:
+
+- **S2K (and S1K)**: the key is bound to the sender's static signet, pairwise.
+  Only the two ends can produce the frame. Zero bytes of overhead, but
+  one message per recipient.
+- **S2S (0.5.0)**: circle confidentiality plus an Ed25519 signature by the
+  sender's signet over the whole message. One message for the whole circle,
+  72 bytes of overhead. Who signed is shown next to the text. The sealed
+  sender name is still only a claim; trust the *signer*.
+
+In **S2E** the name is an unverified claim, because anyone with the
+recipient's public key can seal one.
+
+### S2S: signed circle messages (0.5.0)
+
+S2S is S2C plus a signature. The frames, flags, splitting and rejoin rules
+are exactly S2C's, with mode `S` and context `SIGIL.v2.S.<circle_name>`. The
+last part's plaintext ends with a fixed 72-byte trailer:
+
+```
+last-part plaintext = [slen sender] body || keyid || sig
+keyid     = SHA-256(spk)[0:8]                  ; spk = 32-byte Ed25519 public key
+sig       = Ed25519(sign_sk, signed_bytes)     ; RFC 8032, pure Ed25519, 64 bytes
+signed_bytes =
+      "SIGIL.v2.sig" 0x00
+   || u16(len ctx) || ctx                      ; binds the circle
+   || keyid
+   || u8(n)                                    ; binds the part count
+   || for i in 1..n:
+        u8(len header_i) || header_i           ; flags, part byte, message id
+     || u16(len pt_i)    || pt_i               ; exact part plaintext, trailer removed
+                                               ; (sender field + body, packed if Z)
+```
+
+All lengths are big-endian. One signature covers every part, every header
+(so `i/n`, `J`, `Z` and the 48-bit message id) and the circle. A single-line
+message has no message id, and there is nothing to splice.
+
+**Signing keys.** A 0.5.0 signet holds an Ed25519 key next to its P-256 key
+(`sign_pk`, `sign_sk_pem` in `signet-*.json`). It is announced as
+
+```
+S2+PK.<name>.<short>.<pk33>.<spk32>          ; pk33 P-256 compressed, spk32 Ed25519, both base64url
+```
+
+`S1+PK` is still accepted (a contact without a signing key). The signing key
+fingerprint is `base64url(SHA-256(spk))` (43 chars; `sigil fingerprint`,
+`sigil signet list`). Compare it out of band like any other key.
+
+**Sealer.** The sealer reserves 72 bytes in the last line. If the text fills
+the last line, or the message fits one line but not with the trailer, the
+sealer appends a trailer-only part (empty body, `Z = 0`). That part counts
+toward the 16-part limit.
+
+**Decoders MUST:** apply every S2C rule; reject a last part whose plaintext
+is shorter than 72 bytes; rebuild `signed_bytes` from the parts they
+actually opened; show the text only if the signature verifies under a
+key whose key id matches and which the reader pinned for a named
+contact (or their own signet); never show text from an incomplete S2S
+message or from one with an unknown key id or a bad signature. The key id
+is a hint for picking the key. It is not a trust decision.
+
+**What S2S proves:** that the holder of that Ed25519 key wrote exactly this
+message (all parts, in this order) for this circle. Circle members cannot
+forge or alter it, and cannot reuse a part in another message. The
+signature is transferable within the circle: anyone who can open it can show
+others it was signed.
+
+**What S2S does not prove:** freshness. A captured S2S message can be
+pasted again (keep a replay window above SIGIL if that matters). A circle
+member can also inject a garbage part with the same message id first. The
+message then fails to verify (denial of service, never forgery). The
+signer's name is visible only inside the circle; outsiders see an S2C-sized
+token with mode `S`.
+
+**Line cost.** The trailer is 72 bytes (96 base64 chars). One line holds 84 B
+of text in chat (256) and 67 B in a whisper budget of 234, versus S2C's 156 /
+139. A long message costs the trailer once, so it often needs one extra line
+and never more than one. Measured with `python3 tools/capacity.py`:
+
+| raw bytes | 40 | 67 | 84 | 120 | 200 | 300 | 600 |
+|---|---|---|---|---|---|---|---|
+| S2C / S2K lines, chat 256 | 1 | 1 | 1 | 1 | 2 | 3 | 5 |
+| S2S lines, chat 256 | 1 | 1 | 1 | 2 | 2 | 3 | 5 |
+| S2C / S2K lines, whisper 234 | 1 | 1 | 1 | 1 | 2 | 3 | 5 |
+| S2S lines, whisper 234 | 1 | 1 | 2 | 2 | 3 | 3 | 6 |
+
+The signature is per message, not per line. A broadcast to N readers costs
+S2S one message; the S2K alternative costs N messages at zero overhead each.
 
 ### Sender-side rules (not wire format, but what `sigil.py` and `sigil.html` do)
 
@@ -208,6 +312,7 @@ one.
 | S2K | 152 | 145 | 136 | 129 |
 | S1K | 149 | 141 | 132 | 124 |
 | S2E | 123 | 116 | 106 | 99 |
+| S2S (last line; earlier parts = S2C) | 84 | 77 | 67 | 60 |
 | S1E | 111 | 103 | 95 | 87 |
 
 S2 carries more per line than S1 despite the new header. S1's chunker left
@@ -308,7 +413,8 @@ and would be a local RNG failure, not a protocol one.
 ## What an observer actually learns
 
 - That a SIGIL token was sent.
-- The mode (`C` / `K` / `E`).
+- The mode (`C` / `K` / `E` / `S`). For S2S they do not learn who signed;
+  the key id and signature are inside the ciphertext.
 - The circle slug or the recipient short-id.
 - The approximate size of the plaintext.
 - For S2 (from the unencrypted but authenticated header): whether the codebook
@@ -336,7 +442,9 @@ chat filters is a different project.
   always pasting S2C tokens after dark."
 - Replay. A captured token (or a whole multi-part message) can be pasted
   again later and still opens. Neither S1 nor S2 keeps state to catch this.
-- Impersonation inside a circle: see "What the sender field proves".
+  S2S signatures do not change that.
+- Impersonation inside a plain S2C circle: see "What the sender field proves".
+  Use S2S or S2K when members must be told apart.
 - Weak passphrases. `password1` is not a circle key. Use a diceware
   phrase.
 
@@ -357,7 +465,15 @@ python3 sigil.py publish
 python3 sigil.py contact add Alex S1+PK.Alex....
 python3 sigil.py seal --to Alex "don't tell the admin"
 python3 sigil.py seal --to Alex --ephemeral "one-time drop"
+
+python3 sigil.py signet upgrade Steve        # add an Ed25519 key to a pre-0.5 signet
+python3 sigil.py seal -c deepcave --sign "orders from Steve"   # S2S; --from-signet NAME to pick one
+python3 sigil.py fingerprint                 # P-256 and Ed25519 fingerprints of your signets
 ```
+
+`sigil open` prints an S2S message only after its signature verifies against
+one of your signets or contacts. Otherwise it says why on stderr
+(`S2S message NOT shown: ...`).
 
 Keyring defaults to `./keys` next to the script, or `$SIGIL_HOME`.
 
@@ -367,7 +483,9 @@ Treat that folder like a password file.
 
 Open `sigil.html` locally. No server, no requests. Circles saved in
 localStorage are enough for the common "friend group on this server"
-case and interoperate with the CLI.
+case and interoperate with the CLI. Signets forged in a browser with
+WebCrypto Ed25519 (current Chrome, Firefox and Safari) announce `S2+PK` and can
+seal and verify S2S. Older browsers still get S1+PK signets.
 
 ## Interop rules
 
@@ -381,6 +499,15 @@ case and interoperate with the CLI.
 
 ## Test vectors
 
+`tests/vectors/s2k.json` (S2K) and `tests/vectors/s2s.json` (S2S) use four
+deterministic signets (alice, bob, carol, mallory) whose private keys are
+**published in the file on purpose. They are public test-only keys. Never
+use them for anything.** They cover byte-exact seals (recorded nonces;
+Ed25519 is deterministic, so the signatures are exact too), the signed
+bytes, and negative cases: tampering, every-bit flips, wrong direction,
+impersonation (unknown key, swapped key id), splice across messages,
+dropped signature part, missing part.
+
 `tests/vectors/s1c.json` and `tests/vectors/s2c.json` hold recorded circle
 vectors for other implementations: positive (plain, unicode, codebook, `i/n`,
 boundary lengths, S2 sender and mid-word rejoin), negative (tampering, wrong key,
@@ -389,7 +516,9 @@ message-level cases (splice, interleave, duplicate, missing part). They are
 verified by `python3 -m unittest discover -s tests`, and the S2 file is also
 opened by the browser code via Node (`node tests/js/sigil_node.cjs vectors
 tests/vectors/s2c.json`). The passphrases in these files are **public
-test-only values, not keys**. See `tests/README.md`.
+test-only values, not keys**. All three S2 files are also checked by the
+browser code (`node tests/js/sigil_node.cjs vectors tests/vectors/s2s.json`).
+See `tests/README.md`.
 
 ## License of the idea
 
