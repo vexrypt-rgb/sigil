@@ -1,0 +1,1296 @@
+{
+  "format": "sigil-test-vectors",
+  "format_version": 1,
+  "WARNING": "PUBLIC TEST-ONLY KEY MATERIAL. These passphrases are published on purpose for cross-implementation testing. They are NOT keys. Never use them for real messages.",
+  "suite": "S2C circle messages",
+  "protocol": "S2",
+  "aad_prefix": "SIGIL.v2",
+  "generator": "tools/make_vectors.py --suite s2c (records real sigil.seal_circle_s2 output; random nonces/ids)",
+  "lexicon_v2_sha256": "46137094c869354a1c280884c80157d093f271e6bcab0a353516d5a524ec2278",
+  "kdf": {
+    "alg": "PBKDF2-HMAC-SHA256",
+    "iterations": 210000,
+    "length": 32,
+    "salt": "SHA-256(UTF-8('SIGIL.v1.circle.salt.' + name))[0:16]  (unchanged from S1)"
+  },
+  "seal": {
+    "cipher": "AES-256-GCM",
+    "nonce_len": 12,
+    "tag_len": 16,
+    "header": "flags(1) [part(1) = (i-1)<<4 | (n-1), mid(6)] ; flags: Z=0x01 J=0x02 M=0x04 S=0x08, 0xF0 reserved; part+mid present iff M (n>1)",
+    "aad": "header || UTF-8('SIGIL.v2.C.' + name)",
+    "plaintext": "[len(1) UTF-8 sender, iff S, part 1 only] || body (codebook v2 iff Z, else UTF-8)",
+    "blob": "base64url_nopad(header || nonce || ciphertext || tag)",
+    "token": "S2C.<slug>.<blob>",
+    "rejoin": "concat over i of text_i + (' ' if J_i else '')"
+  },
+  "fields": {
+    "positive[].parts[].payload_hex": "exact bytes that went into AES-GCM (sender field + body)",
+    "positive[].parts[].aad_hex": "exact AAD bytes",
+    "positive[].joined": "rejoined message (exact; equals plaintext except codebook letter case)",
+    "negative[]": "every line must FAIL to open with the given keyring",
+    "messages[]": "open all lines, then assemble: exactly these complete messages may result"
+  },
+  "circles": [
+    {
+      "id": "main",
+      "name": "sigil-vector-test",
+      "passphrase": "sigil-public-test-vector-passphrase-DO-NOT-USE",
+      "slug": "sigi",
+      "fingerprint": "a31n",
+      "kdf": "PBKDF2-HMAC-SHA256/210000",
+      "salt_hex": "a5919131f7ffc2712ebb23c6fa43728a",
+      "key_hex": "7de70578a714bcb128dff637282b3be3a995bd9da6d475eec3ab22949f817e33"
+    },
+    {
+      "id": "wrongpass",
+      "name": "sigil-vector-test",
+      "passphrase": "sigil-public-test-vector-WRONG-passphrase-DO-NOT-USE",
+      "slug": "sigi",
+      "fingerprint": "_sgb",
+      "kdf": "PBKDF2-HMAC-SHA256/210000",
+      "salt_hex": "a5919131f7ffc2712ebb23c6fa43728a",
+      "key_hex": "401dd225e9fffd5fec4456732deb093a93a756c184fb6e7fc329c40fac87b158"
+    },
+    {
+      "id": "sameslug",
+      "name": "sigil-vector-other",
+      "passphrase": "sigil-public-test-vector-passphrase-DO-NOT-USE",
+      "slug": "sigi",
+      "fingerprint": "uoos",
+      "kdf": "PBKDF2-HMAC-SHA256/210000",
+      "salt_hex": "81bac989a7f4be878bef5e1e94b86155",
+      "key_hex": "1dc9c96500081db3c7990ebf07a3bdc02d8a367560a86250bd0400272323b55b"
+    },
+    {
+      "id": "mixedcase",
+      "name": "Sigil-Vector-MixedCase",
+      "passphrase": "sigil-public-test-vector-passphrase-DO-NOT-USE",
+      "slug": "sigi",
+      "fingerprint": "fgvg",
+      "kdf": "PBKDF2-HMAC-SHA256/210000",
+      "salt_hex": "2f41745570f635310388b630c3b0e104",
+      "key_hex": "0247de9accc965f582a2bdb345cfcd629da448064aeb1652aa17f4d8f08400d9"
+    }
+  ],
+  "positive": [
+    {
+      "id": "plain-short",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "portal at 1847 12 -320",
+      "plaintext_utf8_hex": "706f7274616c2061742031383437203132202d333230",
+      "lines": [
+        "S2C.sigi.ANmG4k6edG68QnzcUSsiP9BVg_hDZnN-mEUPvEXR7wHSohUtWSLIL0XiZp2CRt5g5P5r"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.ANmG4k6edG68QnzcUSsiP9BVg_hDZnN-mEUPvEXR7wHSohUtWSLIL0XiZp2CRt5g5P5r",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "d986e24e9e746ebc427cdc51",
+          "aad_hex": "00534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "706f7274616c2061742031383437203132202d333230",
+          "plaintext": "portal at 1847 12 -320"
+        }
+      ],
+      "joined": "portal at 1847 12 -320",
+      "joined_equals_plaintext": true,
+      "note": "Raw UTF-8, one line: header is the single flags byte 0x00."
+    },
+    {
+      "id": "plain-empty",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "",
+      "plaintext_utf8_hex": "",
+      "lines": [
+        "S2C.sigi.ALed8giJxOH9KfHiqdKxdHdO80k-TVJRhp6dPV4"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.ALed8giJxOH9KfHiqdKxdHdO80k-TVJRhp6dPV4",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "b79df20889c4e1fd29f1e2a9",
+          "aad_hex": "00534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "",
+          "plaintext": ""
+        }
+      ],
+      "joined": "",
+      "joined_equals_plaintext": true,
+      "note": "Empty plaintext: 1 + 12 + 16 byte frame."
+    },
+    {
+      "id": "plain-single-line-max",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "plaintext_utf8_hex": "616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+      "lines": [
+        "S2C.sigi.ACAUZ5SFG1b-WObSdQaLLaXfCQZGSrnTFOba8N4v18Cq1Nvz1gR-H8tH9qLBD-7Qd_l03vh0BhjbJlKQGg2YeBQLkknsF-edkKcQBPAEjTSWY7rV2BaaWe8yUKuDexDVZAzP8sgNxMtj0XeMD2ay9pqoLwrGzJR4VxLa6Sz4kWt4zh-Qo_dLUeq61cJ8qAjIl8wFFn00-s2zdEi9Y9zKpDC01hZ5wjYQxWDDUsIKPrSiFHo0bKSJDJI"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.ACAUZ5SFG1b-WObSdQaLLaXfCQZGSrnTFOba8N4v18Cq1Nvz1gR-H8tH9qLBD-7Qd_l03vh0BhjbJlKQGg2YeBQLkknsF-edkKcQBPAEjTSWY7rV2BaaWe8yUKuDexDVZAzP8sgNxMtj0XeMD2ay9pqoLwrGzJR4VxLa6Sz4kWt4zh-Qo_dLUeq61cJ8qAjIl8wFFn00-s2zdEi9Y9zKpDC01hZ5wjYQxWDDUsIKPrSiFHo0bKSJDJI",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "20146794851b56fe58e6d275",
+          "aad_hex": "00534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+          "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "joined": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "joined_equals_plaintext": true,
+      "note": "Longest ASCII run (156 B) that fits one line at max_line=256."
+    },
+    {
+      "id": "plain-first-split",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "plaintext_utf8_hex": "61616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+      "lines": [
+        "S2C.sigi.BAGsi0twUYtNUzQsWoLvaTt925FdM9-PuNRl1CGh3ElzTPfcoG4bKyFk9HMhHwmxbkGiqgdKv7mVXJ6ELHrCMQ-MHGI7abdm_6_GhH8k8jcSnjLskCZoXHFiVtQ_dt4sAnjI6SYk5u6BCKKOcuQGtFNregYkEP_cJOQwzSJ5GwuIpXzfmz6QtvhGB8M8TTIM5IX2SbDFdTjAQ5HrxErUUXXzOPyEOvzEk2ZcB2pgCvP2FMYl4yy1zPo",
+        "S2C.sigi.BBGsi0twUYvjiBULevMSQ8pidlDztbyVS_Lni5bO-t2IBGRmdnZVY_Lc71M"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.BAGsi0twUYtNUzQsWoLvaTt925FdM9-PuNRl1CGh3ElzTPfcoG4bKyFk9HMhHwmxbkGiqgdKv7mVXJ6ELHrCMQ-MHGI7abdm_6_GhH8k8jcSnjLskCZoXHFiVtQ_dt4sAnjI6SYk5u6BCKKOcuQGtFNregYkEP_cJOQwzSJ5GwuIpXzfmz6QtvhGB8M8TTIM5IX2SbDFdTjAQ5HrxErUUXXzOPyEOvzEk2ZcB2pgCvP2FMYl4yy1zPo",
+          "index": 1,
+          "total": 2,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "0401ac8b4b70518b",
+          "mid_hex": "ac8b4b70518b",
+          "nonce_hex": "4d53342c5a82ef693b7ddb91",
+          "aad_hex": "0401ac8b4b70518b534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+          "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "token": "S2C.sigi.BBGsi0twUYvjiBULevMSQ8pidlDztbyVS_Lni5bO-t2IBGRmdnZVY_Lc71M",
+          "index": 2,
+          "total": 2,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "0411ac8b4b70518b",
+          "mid_hex": "ac8b4b70518b",
+          "nonce_hex": "e388150b7af31243ca627650",
+          "aad_hex": "0411ac8b4b70518b534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "6161616161616161",
+          "plaintext": "aaaaaaaa"
+        }
+      ],
+      "joined": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "joined_equals_plaintext": true,
+      "note": "One byte more: two parts, each with part byte + 6-byte message id."
+    },
+    {
+      "id": "plain-max-line-180",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 180,
+        "sender": ""
+      },
+      "plaintext": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "plaintext_utf8_hex": "626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262",
+      "lines": [
+        "S2C.sigi.ADqBv30dpn6LSAF8Lv-l4dVHggAFIUq0JrcQTMROClj909LG2KuGcImNo7VHPo-oKe-pM3tbaGaJyO0zxQ1T2CKEZV_gp2hUsZlpWUbplF2KHZTtb4eiAiPl3mEs0UwICFYpjYXA1_RrVOXhPX55bVjcmT0YOY2_6vqMBtmWeRw"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.ADqBv30dpn6LSAF8Lv-l4dVHggAFIUq0JrcQTMROClj909LG2KuGcImNo7VHPo-oKe-pM3tbaGaJyO0zxQ1T2CKEZV_gp2hUsZlpWUbplF2KHZTtb4eiAiPl3mEs0UwICFYpjYXA1_RrVOXhPX55bVjcmT0YOY2_6vqMBtmWeRw",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "3a81bf7d1da67e8b48017c2e",
+          "aad_hex": "00534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262",
+          "plaintext": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "joined": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "joined_equals_plaintext": true,
+      "note": "Longest single line at max_line=180 (99 B)."
+    },
+    {
+      "id": "plain-multipart-3",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij",
+      "plaintext_utf8_hex": "6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a",
+      "lines": [
+        "S2C.sigi.BAIjxX-4xd0YC8F3pGw9HBGU1_I6HsrkKPQWGfsxcKxQirsZOq4cXXrCAXHYX6i9xXbZYXU3D8ypF4WjTHiqL30MawOvyQsl1IehCLSm34Ani9dBtvD3VObNmGIrwm4mOKmL87Wg0f-FRoyxAWVfvdQnYKi1wBsvgiL_LroC9EQNvj8P6qoUeOyyG5UeGWstFYrRiX7vgBv7RiCxT3FSd4qYU4bQf-zfxZgXtudHjsbqObcTjHsklA4",
+        "S2C.sigi.BBIjxX-4xd37OwfW60Hv3jmSc__swAMLakv39azxsr70Avr10eFANmGpEr0euA0ni31Y4fP_fMGvfEOLW9C_M4VgamFqHtjqMP8Wbqu7ZhKBOE_04Nlywyc9l3fDUl6L5M59-ZQkRbTJEgGnc8RnDMr68cfT32elc30IJ9YQ6K1ElkI0uNcCSsVFJ_o0kQRV2VTHkY40p98hBAOV95c39Yc0s4v5RY6DYfZPO2UjsSKUtk8vMT__Pjg",
+        "S2C.sigi.BCIjxX-4xd0adICL4WVIYg3fk5daFTvl_hlhN9tnyjbDjU905lb6BkZS4EVkH8EDdJmaKybSpVRMKgLwvP5EXGO3dDUM_uHH4jg3oCk6vaa37Z9jlBaRaNVpRxO9cgVEi7WCTpen90n80SZc6m8LTKcIpM8-2EK5LJbw3TYsQ_Yb7JwXmH41c0qT"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.BAIjxX-4xd0YC8F3pGw9HBGU1_I6HsrkKPQWGfsxcKxQirsZOq4cXXrCAXHYX6i9xXbZYXU3D8ypF4WjTHiqL30MawOvyQsl1IehCLSm34Ani9dBtvD3VObNmGIrwm4mOKmL87Wg0f-FRoyxAWVfvdQnYKi1wBsvgiL_LroC9EQNvj8P6qoUeOyyG5UeGWstFYrRiX7vgBv7RiCxT3FSd4qYU4bQf-zfxZgXtudHjsbqObcTjHsklA4",
+          "index": 1,
+          "total": 3,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "040223c57fb8c5dd",
+          "mid_hex": "23c57fb8c5dd",
+          "nonce_hex": "180bc177a46c3d1c1194d7f2",
+          "aad_hex": "040223c57fb8c5dd534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a616263646566676869",
+          "plaintext": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghi"
+        },
+        {
+          "token": "S2C.sigi.BBIjxX-4xd37OwfW60Hv3jmSc__swAMLakv39azxsr70Avr10eFANmGpEr0euA0ni31Y4fP_fMGvfEOLW9C_M4VgamFqHtjqMP8Wbqu7ZhKBOE_04Nlywyc9l3fDUl6L5M59-ZQkRbTJEgGnc8RnDMr68cfT32elc30IJ9YQ6K1ElkI0uNcCSsVFJ_o0kQRV2VTHkY40p98hBAOV95c39Yc0s4v5RY6DYfZPO2UjsSKUtk8vMT__Pjg",
+          "index": 2,
+          "total": 3,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "041223c57fb8c5dd",
+          "mid_hex": "23c57fb8c5dd",
+          "nonce_hex": "fb3b07d6eb41efde399273ff",
+          "aad_hex": "041223c57fb8c5dd534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "6a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768",
+          "plaintext": "jabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefgh"
+        },
+        {
+          "token": "S2C.sigi.BCIjxX-4xd0adICL4WVIYg3fk5daFTvl_hlhN9tnyjbDjU905lb6BkZS4EVkH8EDdJmaKybSpVRMKgLwvP5EXGO3dDUM_uHH4jg3oCk6vaa37Z9jlBaRaNVpRxO9cgVEi7WCTpen90n80SZc6m8LTKcIpM8-2EK5LJbw3TYsQ_Yb7JwXmH41c0qT",
+          "index": 3,
+          "total": 3,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "042223c57fb8c5dd",
+          "mid_hex": "23c57fb8c5dd",
+          "nonce_hex": "1a74808be16548620ddf9397",
+          "aad_hex": "042223c57fb8c5dd534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a",
+          "plaintext": "ijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij"
+        }
+      ],
+      "joined": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij",
+      "joined_equals_plaintext": true,
+      "note": "Three raw parts cut mid-word; J=0 everywhere; rejoin is exact."
+    },
+    {
+      "id": "unicode-mixed",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "Grüße 🧭 北 -320 / ñ / שלום / é",
+      "plaintext_utf8_hex": "4772c3bcc39f6520f09fa7ad20e58c97202d333230202f20c3b1202f20d7a9d79cd795d79d202f2065cc81",
+      "lines": [
+        "S2C.sigi.APnzib7YJ5TDYD7o5P5utTs40eBf7RRX-PtZx63A1ACkld2EUftGrGh-YIO_5_slwJ5w_GynXlAmPTMRRqmkjYCenBh9VXgt"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.APnzib7YJ5TDYD7o5P5utTs40eBf7RRX-PtZx63A1ACkld2EUftGrGh-YIO_5_slwJ5w_GynXlAmPTMRRqmkjYCenBh9VXgt",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "f9f389bed82794c3603ee8e4",
+          "aad_hex": "00534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "4772c3bcc39f6520f09fa7ad20e58c97202d333230202f20c3b1202f20d7a9d79cd795d79d202f2065cc81",
+          "plaintext": "Grüße 🧭 北 -320 / ñ / שלום / é"
+        }
+      ],
+      "joined": "Grüße 🧭 北 -320 / ñ / שלום / é",
+      "joined_equals_plaintext": true,
+      "note": "Multi-byte UTF-8, emoji, RTL, combining mark."
+    },
+    {
+      "id": "unicode-multipart-emoji",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱",
+      "plaintext_utf8_hex": "f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1",
+      "lines": [
+        "S2C.sigi.BAKr8YYYpaxLsXw13pepzzVEB65ntsaWeHekXANLSnsrNgBp3EVmqfXmBOV3FaL1FXkuuhNvTXp_OafJElnjRT84l2C_S5DCAhRGfFtOjby0HtFdiyR-RzGaMCdOx20rWfaRbsfBcwIwQsxSqvp9UAACJQUyyGEhnc8jPyM7u54HsHpvypK_UiRdFb45Y2uVVs82-mMcK4w0a4sXh9IFdpykR_OuegzR6e1e-IDiQ8xkNXIpU5M39Q",
+        "S2C.sigi.BBKr8YYYpazMbmUhfpKdRSVgj98sCVSXoVz4cH4A2TYvPoC9QuhTDhOjt8ULFFLU6ROO5lT-KZmJN1u0yDCoM1S9nsgCeUlkT0dHLUgDKi5mdnxQH3vP4skeeV9NTt1bUv4r2HBVhOwZfbSmaWi1yqOVHbkxO3yV_m3kPorfOt0xfeC0i7_U_eweSXDrh--8LlYAOZmtJBO4PJRwyndTVtv_Uy8l5nBO4dy0JX3vXqM8INM15fBfLQ",
+        "S2C.sigi.BCKr8YYYpay_H1ok9QBQ74rtlLnQfiBWR7aM49ds_VgXwCrWQcgEnysl3zXYpyEQIwAhb2_0mLRMISSX"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.BAKr8YYYpaxLsXw13pepzzVEB65ntsaWeHekXANLSnsrNgBp3EVmqfXmBOV3FaL1FXkuuhNvTXp_OafJElnjRT84l2C_S5DCAhRGfFtOjby0HtFdiyR-RzGaMCdOx20rWfaRbsfBcwIwQsxSqvp9UAACJQUyyGEhnc8jPyM7u54HsHpvypK_UiRdFb45Y2uVVs82-mMcK4w0a4sXh9IFdpykR_OuegzR6e1e-IDiQ8xkNXIpU5M39Q",
+          "index": 1,
+          "total": 3,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "0402abf18618a5ac",
+          "mid_hex": "abf18618a5ac",
+          "nonce_hex": "4bb17c35de97a9cf354407ae",
+          "aad_hex": "0402abf18618a5ac534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1",
+          "plaintext": "🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱"
+        },
+        {
+          "token": "S2C.sigi.BBKr8YYYpazMbmUhfpKdRSVgj98sCVSXoVz4cH4A2TYvPoC9QuhTDhOjt8ULFFLU6ROO5lT-KZmJN1u0yDCoM1S9nsgCeUlkT0dHLUgDKi5mdnxQH3vP4skeeV9NTt1bUv4r2HBVhOwZfbSmaWi1yqOVHbkxO3yV_m3kPorfOt0xfeC0i7_U_eweSXDrh--8LlYAOZmtJBO4PJRwyndTVtv_Uy8l5nBO4dy0JX3vXqM8INM15fBfLQ",
+          "index": 2,
+          "total": 3,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "0412abf18618a5ac",
+          "mid_hex": "abf18618a5ac",
+          "nonce_hex": "cc6e65217e929d4525608fdf",
+          "aad_hex": "0412abf18618a5ac534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1",
+          "plaintext": "🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱"
+        },
+        {
+          "token": "S2C.sigi.BCKr8YYYpay_H1ok9QBQ74rtlLnQfiBWR7aM49ds_VgXwCrWQcgEnysl3zXYpyEQIwAhb2_0mLRMISSX",
+          "index": 3,
+          "total": 3,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "0422abf18618a5ac",
+          "mid_hex": "abf18618a5ac",
+          "nonce_hex": "bf1f5a24f50050ef8aed94b9",
+          "aad_hex": "0422abf18618a5ac534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1",
+          "plaintext": "🧱🧱🧱🧱🧱🧱"
+        }
+      ],
+      "joined": "🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱",
+      "joined_equals_plaintext": true,
+      "note": "4-byte code points; parts never split inside a code point."
+    },
+    {
+      "id": "newline",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "line one\nline two",
+      "plaintext_utf8_hex": "6c696e65206f6e650a6c696e652074776f",
+      "lines": [
+        "S2C.sigi.APpKg512EAQlN1SYyCVIHb4oJ8rKLgVJQ6Mp0ekoM7a2pW9bnBqYSjBV1rT1cA"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.APpKg512EAQlN1SYyCVIHb4oJ8rKLgVJQ6Mp0ekoM7a2pW9bnBqYSjBV1rT1cA",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "fa4a839d76100425375498c8",
+          "aad_hex": "00534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "6c696e65206f6e650a6c696e652074776f",
+          "plaintext": "line one\nline two"
+        }
+      ],
+      "joined": "line one\nline two",
+      "joined_equals_plaintext": true,
+      "note": "Newlines survive."
+    },
+    {
+      "id": "compact-z",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": true,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "nether roof stash at 0 128 0",
+      "plaintext_utf8_hex": "6e657468657220726f6f662073746173682061742030203132382030",
+      "lines": [
+        "S2C.sigi.AcODRHz2WEgxposoZgc6yL019nuhaqQoIlOSJm8Myu43EQlyU9Y"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.AcODRHz2WEgxposoZgc6yL019nuhaqQoIlOSJm8Myu43EQlyU9Y",
+          "index": 1,
+          "total": 1,
+          "flags": 1,
+          "codebook": true,
+          "join": false,
+          "sender": null,
+          "header_hex": "01",
+          "mid_hex": "",
+          "nonce_hex": "c383447cf6584831a68b2866",
+          "aad_hex": "01534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "c200100604440181c0",
+          "plaintext": "nether roof stash at 0 128 0"
+        }
+      ],
+      "joined": "nether roof stash at 0 128 0",
+      "joined_equals_plaintext": true,
+      "note": "Codebook v2 body (flags bit Z). payload_hex starts with 0xC2."
+    },
+    {
+      "id": "compact-no-gain",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": true,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "Zq9xKv7Wm3",
+      "plaintext_utf8_hex": "5a7139784b7637576d33",
+      "lines": [
+        "S2C.sigi.APWDIroBfeH67ymvD3LB2VuVlSpr8EWiS7AjAVggQnF1VtFJBOD7"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.APWDIroBfeH67ymvD3LB2VuVlSpr8EWiS7AjAVggQnF1VtFJBOD7",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "f58322ba017de1faef29af0f",
+          "aad_hex": "00534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "5a7139784b7637576d33",
+          "plaintext": "Zq9xKv7Wm3"
+        }
+      ],
+      "joined": "Zq9xKv7Wm3",
+      "joined_equals_plaintext": true,
+      "note": "Compact requested, codebook does not shrink it: Z=0, raw UTF-8."
+    },
+    {
+      "id": "compact-multipart-spaces",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": true,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon",
+      "plaintext_utf8_hex": "6e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e",
+      "lines": [
+        "S2C.sigi.BwL6yqmYFP6SyiOGd3Himy-rNMQFYIReWudNww4S3SyXzGSG5t8L1jqFHCbICNZ3RmvYiwc0RXuiKq61ivzkR7QMRY8UGNtOOpqt1SpP8WWIJ48sfJq-VMGsIm26nEmFNG4IpXsp3rW-HTIaP9i3ZygQNtqQ_rsK7vnxRrTWl0FAeVgOS7VmOF_YdUqITcyfGbNDgkEINkx5COKnsl70bPx3yURDBBPS9W9G9OW1TEn5ezv0cQ",
+        "S2C.sigi.BxL6yqmYFP4EwwNSBKA9ECGn34xjAme51XDT0a0TCmVbq9FnXb4-6I7QiO536JZWmIRdZiMBkTOeZOi12yScJq4uh8KlQPvk7HWXAWLTaU4W7uaIzmyxkAGH5USUuKnZtUf6yu-gyAUFcY0CrZkxasFZOwuBQl-9kN_g9dhr0aXXeKOVQ1pCiH7ACgEXhE0jW-74mssirPnHqXqcnPKSohrMbMeHGqizakrVigqMsY3h-anQtCs",
+        "S2C.sigi.BSL6yqmYFP5NS5srDNNxGt0XDeqFyYUgeOR2mm5BBZ3IlwafC5di7o_KG5dpKr-XRon97zTYcNtsMvWizNZx4LS90AypemupaA"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.BwL6yqmYFP6SyiOGd3Himy-rNMQFYIReWudNww4S3SyXzGSG5t8L1jqFHCbICNZ3RmvYiwc0RXuiKq61ivzkR7QMRY8UGNtOOpqt1SpP8WWIJ48sfJq-VMGsIm26nEmFNG4IpXsp3rW-HTIaP9i3ZygQNtqQ_rsK7vnxRrTWl0FAeVgOS7VmOF_YdUqITcyfGbNDgkEINkx5COKnsl70bPx3yURDBBPS9W9G9OW1TEn5ezv0cQ",
+          "index": 1,
+          "total": 3,
+          "flags": 7,
+          "codebook": true,
+          "join": true,
+          "sender": null,
+          "header_hex": "0702facaa99814fe",
+          "mid_hex": "facaa99814fe",
+          "nonce_hex": "92ca23867771e29b2fab34c4",
+          "aad_hex": "0702facaa99814fe534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "c2001006044401809c49404a2c45052a024083d50120120800200c0888030138928094588a0a54048107aa024024100040181110060271250128b11414a809020f540480482000803022200c04e24a02516228295012041ea80900904001006044401809c49404a2c45052a024083d50120120800200c0888030138928094588a0a54048107aa0240241000401811100e0",
+          "plaintext": "nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128"
+        },
+        {
+          "token": "S2C.sigi.BxL6yqmYFP4EwwNSBKA9ECGn34xjAme51XDT0a0TCmVbq9FnXb4-6I7QiO536JZWmIRdZiMBkTOeZOi12yScJq4uh8KlQPvk7HWXAWLTaU4W7uaIzmyxkAGH5USUuKnZtUf6yu-gyAUFcY0CrZkxasFZOwuBQl-9kN_g9dhr0aXXeKOVQ1pCiH7ACgEXhE0jW-74mssirPnHqXqcnPKSohrMbMeHGqizakrVigqMsY3h-anQtCs",
+          "index": 2,
+          "total": 3,
+          "flags": 7,
+          "codebook": true,
+          "join": true,
+          "sender": null,
+          "header_hex": "0712facaa99814fe",
+          "mid_hex": "facaa99814fe",
+          "nonce_hex": "04c3035204a03d1021a7df8c",
+          "aad_hex": "0712facaa99814fe534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "c260271250128b11414a809020f540480482000803022200c04e24a02516228295012041ea80900904001006044401809c49404a2c45052a024083d50120120800200c0888030138928094588a0a54048107aa024024100040181110060271250128b11414a809020f540480482000803022200c04e24a02516228295012041ea80900904001006044401809c49404a2b6e0",
+          "plaintext": "0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond"
+        },
+        {
+          "token": "S2C.sigi.BSL6yqmYFP5NS5srDNNxGt0XDeqFyYUgeOR2mm5BBZ3IlwafC5di7o_KG5dpKr-XRon97zTYcNtsMvWizNZx4LS90AypemupaA",
+          "index": 3,
+          "total": 3,
+          "flags": 5,
+          "codebook": true,
+          "join": false,
+          "sender": null,
+          "header_hex": "0522facaa99814fe",
+          "mid_hex": "facaa99814fe",
+          "nonce_hex": "4d4b9b2b0cd3711add170dea",
+          "aad_hex": "0522facaa99814fe534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "c2523ea0a54048107aa024024100040181110060271250128b11414a809020f54048048270",
+          "plaintext": "pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon"
+        }
+      ],
+      "joined": "nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon",
+      "joined_equals_plaintext": true,
+      "note": "Compact parts cut at a space that is consumed: J=1 on every part but the last. Rejoin is exact (S1 needed a heuristic here)."
+    },
+    {
+      "id": "compact-multipart-midword",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": true,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon",
+      "plaintext_utf8_hex": "73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e2f73746173682f706f7274616c2f6469616d6f6e642f6e65746865722f726f6f662f7069636b6178652f656e6465722f647261676f6e",
+      "lines": [
+        "S2C.sigi.BQSTIClvzktUicIHKSEIaTsIhfPeJNEcZ0RNGsQrvxzKnOpk8CzGAjgon2EwRtAiAvA0pZ8aJHqXuov4bM9bMOr16hY0ITDHVFQuU4Xu-DbzyGvt5r9RjWfX0kr3WzdcWuC_Beq3x0QDbepBO6JeltZ7OZf8xMfNcVBusIQLIDciuH42Duz1p9qtKON-sQLEUIOPYlYPK3ue5cI0wz1uNWYs11Ve_ZJdwp8GxB0ERvFPDck77yOIwpQ",
+        "S2C.sigi.BRSTIClvzktxsYkGzStmNf-hF2-QkRxOyeJuYO74eardOlrogB84fc4-Q-tzU1aTxmGLxMTJoMeu0Fy0KlCxj-Xm3P1D6Bmy05VQ9Olxe1Nq35_U2UTAYuMQSE2plt9PsXHd8e11xLSNfKaGKriKI3-kaZXbXWYWH4UjQFPP-Gz4DVyO60NgpGaA-bTiILYfxztUXTTWZ3RvjPpT3_N2cxsGH4Lo08-lRJLaP-Ds9vR1QkbSPOGU02I",
+        "S2C.sigi.BSSTIClvzkvpv62CS5yIZqoccNS7q0rw3-UTTMpUZxsI3G5iyBB584DIShgZE25LmrZiA6Fb2bFpb-WoQo-Ve_pwgogf2zTdGGtks2Vp9yiN5-6qIzN7B0T_qaEeLAIV8EdNFMhRsRgfhFtu2iv2mmSANt6hq4ZiHaUYG81zAynoE9C1Vea3wIWwLuUYOLEhCfQjqRnByz3PIwKyvR34_fomz9QjN1Pd1pKGO-8y_hDQfqzukWpwGg",
+        "S2C.sigi.BTSTIClvzkvG5ImTTh9d5IysNDIMdZuQGjO7dRI8w8m-lus_hRVmi9oC7DchpLOyPFfEJuSzc_mamHEgw_B0BIOYv-Z93hFDkkJDWDYjEubP3PBhiYYl96mgthwFVMiEWBd6KSF04Wx8fI3U6a3Bbr6my_NlMZwE7iyQywa5JzfpW4bBONlT3hiWLSva7BAiuFCeCh07JCtqslsPsE54MEzMit-PaMyCWlooTwputSZrIKg1PWCyz6Y",
+        "S2C.sigi.BUSTIClvzktPu-K-1A8_yJfoUjs3lxbPWuzrc5tiVbZjR30K9aCtjflxtaBDM63yzntDL7yKRcEJ9a52S2FSForqfO4IrdNALYM7jXIaWFHwQh1ifGVWKpCuWXs_786wA693bUAkauOKnKBjxgC6kTm8YqFlAp6s6Q"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.BQSTIClvzktUicIHKSEIaTsIhfPeJNEcZ0RNGsQrvxzKnOpk8CzGAjgon2EwRtAiAvA0pZ8aJHqXuov4bM9bMOr16hY0ITDHVFQuU4Xu-DbzyGvt5r9RjWfX0kr3WzdcWuC_Beq3x0QDbepBO6JeltZ7OZf8xMfNcVBusIQLIDciuH42Duz1p9qtKON-sQLEUIOPYlYPK3ue5cI0wz1uNWYs11Ve_ZJdwp8GxB0ERvFPDck77yOIwpQ",
+          "index": 1,
+          "total": 5,
+          "flags": 5,
+          "codebook": true,
+          "join": false,
+          "sender": null,
+          "header_hex": "05049320296fce4b",
+          "mid_hex": "9320296fce4b",
+          "nonce_hex": "5489c207292108693b0885f3",
+          "aad_hex": "05049320296fce4b534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "c24ea15942fd6456d5942e5650bb5948fd650c159435564ea15942fd6456d5942e5650bb5948fd650c159435564ea15942fd6456d5942e5650bb5948fd650c159435564ea15942fd6456d5942e5650bb5948fd650c159435564ea15942fd6456d5942e5650bb5948fd650c159435564ea15942fd6456d5942e5650bb5948fd650c159435564ea15942fd6456d5942e5650bb5b0387",
+          "plaintext": "stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/p"
+        },
+        {
+          "token": "S2C.sigi.BRSTIClvzktxsYkGzStmNf-hF2-QkRxOyeJuYO74eardOlrogB84fc4-Q-tzU1aTxmGLxMTJoMeu0Fy0KlCxj-Xm3P1D6Bmy05VQ9Olxe1Nq35_U2UTAYuMQSE2plt9PsXHd8e11xLSNfKaGKriKI3-kaZXbXWYWH4UjQFPP-Gz4DVyO60NgpGaA-bTiILYfxztUXTTWZ3RvjPpT3_N2cxsGH4Lo08-lRJLaP-Ds9vR1QkbSPOGU02I",
+          "index": 2,
+          "total": 5,
+          "flags": 5,
+          "codebook": true,
+          "join": false,
+          "sender": null,
+          "header_hex": "05149320296fce4b",
+          "mid_hex": "9320296fce4b",
+          "nonce_hex": "71b18906cd2b6635ffa1176f",
+          "aad_hex": "05149320296fce4b534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "c2cad2c6d6c2f0cb594305650d5593a85650bf5915b5650b95942ed6523f594305650d5593a85650bf5915b5650b95942ed6523f594305650d5593a85650bf5915b5650b95942ed6523f594305650d5593a85650bf5915b5650b95942ed6523f594305650d5593a85650bf5915b5650b95942ed6523f594305650d5593a85650bf5915b5650b95942ed6523f594305650d5593a870",
+          "plaintext": "ickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash"
+        },
+        {
+          "token": "S2C.sigi.BSSTIClvzkvpv62CS5yIZqoccNS7q0rw3-UTTMpUZxsI3G5iyBB584DIShgZE25LmrZiA6Fb2bFpb-WoQo-Ve_pwgogf2zTdGGtks2Vp9yiN5-6qIzN7B0T_qaEeLAIV8EdNFMhRsRgfhFtu2iv2mmSANt6hq4ZiHaUYG81zAynoE9C1Vea3wIWwLuUYOLEhCfQjqRnByz3PIwKyvR34_fomz9QjN1Pd1pKGO-8y_hDQfqzukWpwGg",
+          "index": 3,
+          "total": 5,
+          "flags": 5,
+          "codebook": true,
+          "join": false,
+          "sender": null,
+          "header_hex": "05249320296fce4b",
+          "mid_hex": "9320296fce4b",
+          "nonce_hex": "e9bfad824b9c8866aa1c70d4",
+          "aad_hex": "05249320296fce4b534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "c2aca17eb22b6aca172b285daca47eb2860aca1aab2750aca17eb22b6aca172b285daca47eb2860aca1aab2750aca17eb22b6aca172b285daca47eb2860aca1aab2750aca17eb22b6aca172b285daca47eb2860aca1aab2750aca17eb22b6aca172b285daca47eb2860aca1aab2750aca17eb22b6aca172b285daca47eb2860aca1aab2750aca17eb22b6aca172b285daca47eb7",
+          "plaintext": "/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/"
+        },
+        {
+          "token": "S2C.sigi.BTSTIClvzkvG5ImTTh9d5IysNDIMdZuQGjO7dRI8w8m-lus_hRVmi9oC7DchpLOyPFfEJuSzc_mamHEgw_B0BIOYv-Z93hFDkkJDWDYjEubP3PBhiYYl96mgthwFVMiEWBd6KSF04Wx8fI3U6a3Bbr6my_NlMZwE7iyQywa5JzfpW4bBONlT3hiWLSva7BAiuFCeCh07JCtqslsPsE54MEzMit-PaMyCWlooTwputSZrIKg1PWCyz6Y",
+          "index": 4,
+          "total": 5,
+          "flags": 5,
+          "codebook": true,
+          "join": false,
+          "sender": null,
+          "header_hex": "05349320296fce4b",
+          "mid_hex": "9320296fce4b",
+          "nonce_hex": "c6e489934e1f5de48cac3432",
+          "aad_hex": "05349320296fce4b534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "c250c159435564ea15942fd6456d5942e5650bb5948fd650c159435564ea15942fd6456d5942e5650bb5948fd650c159435564ea15942fd6456d5942e5650bb5948fd650c159435564ea15942fd6456d5942e5650bb5948fd650c159435564ea15942fd6456d5942e5650bb5948fd650c159435564ea15942fd6456d5942e5650bb5948fd650c159435564ea15942fd6456d5b0377",
+          "plaintext": "ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/n"
+        },
+        {
+          "token": "S2C.sigi.BUSTIClvzktPu-K-1A8_yJfoUjs3lxbPWuzrc5tiVbZjR30K9aCtjflxtaBDM63yzntDL7yKRcEJ9a52S2FSForqfO4IrdNALYM7jXIaWFHwQh1ifGVWKpCuWXs_786wA693bUAkauOKnKBjxgC6kTm8YqFlAp6s6Q",
+          "index": 5,
+          "total": 5,
+          "flags": 5,
+          "codebook": true,
+          "join": false,
+          "sender": null,
+          "header_hex": "05449320296fce4b",
+          "mid_hex": "9320296fce4b",
+          "nonce_hex": "4fbbe2bed40f3fc897e8523b",
+          "aad_hex": "05449320296fce4b534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "c2c8cae8d0cae55942ed6523f594305650d5593a85650bf5915b5650b95942ed6523f594305650d5593a85650bf5915b5650b95942ed6523f594305650d5593a85650bf5915b5650b95942ed6523f594305650d5c0",
+          "plaintext": "ether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon"
+        }
+      ],
+      "joined": "stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon/stash/portal/diamond/nether/roof/pickaxe/ender/dragon",
+      "joined_equals_plaintext": true,
+      "note": "No spaces at all: compact parts are cut mid-word (J=0) and still rejoin exactly. S1's stitcher would insert a space at each cut."
+    },
+    {
+      "id": "compact-case",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": true,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "Nether Roof stash at 0 128 0",
+      "plaintext_utf8_hex": "4e657468657220526f6f662073746173682061742030203132382030",
+      "lines": [
+        "S2C.sigi.Ab8w6EzwJcjwFQdeutoijAMaF2qta3C9VugJgdLuq_Gu-efqOFw"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.Ab8w6EzwJcjwFQdeutoijAMaF2qta3C9VugJgdLuq_Gu-efqOFw",
+          "index": 1,
+          "total": 1,
+          "flags": 1,
+          "codebook": true,
+          "join": false,
+          "sender": null,
+          "header_hex": "01",
+          "mid_hex": "",
+          "nonce_hex": "bf30e84cf025c8f015075eba",
+          "aad_hex": "01534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "c200100604440181c0",
+          "plaintext": "nether roof stash at 0 128 0"
+        }
+      ],
+      "joined": "nether roof stash at 0 128 0",
+      "joined_equals_plaintext": false,
+      "note": "Sealer policy: the codebook may lowercase dictionary words, so parts[].plaintext can differ from the input in letter case only."
+    },
+    {
+      "id": "sender-single",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": "Steve"
+      },
+      "plaintext": "anon or not",
+      "plaintext_utf8_hex": "616e6f6e206f72206e6f74",
+      "lines": [
+        "S2C.sigi.CF1uZwBYrl15x76eOJNTdQH-_oL4wxj7hpbsgDKV-G_T2ix_ENUJJvHuTH2hbQ"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.CF1uZwBYrl15x76eOJNTdQH-_oL4wxj7hpbsgDKV-G_T2ix_ENUJJvHuTH2hbQ",
+          "index": 1,
+          "total": 1,
+          "flags": 8,
+          "codebook": false,
+          "join": false,
+          "sender": "Steve",
+          "header_hex": "08",
+          "mid_hex": "",
+          "nonce_hex": "5d6e670058ae5d79c7be9e38",
+          "aad_hex": "08534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "055374657665616e6f6e206f72206e6f74",
+          "plaintext": "anon or not"
+        }
+      ],
+      "joined": "anon or not",
+      "joined_equals_plaintext": true,
+      "note": "Sender sealed inside the ciphertext (flags bit S): [len][UTF-8 name] then body. Any holder of the circle key can claim any name."
+    },
+    {
+      "id": "sender-multipart",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": "Steve"
+      },
+      "plaintext": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij",
+      "plaintext_utf8_hex": "6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a",
+      "lines": [
+        "S2C.sigi.DAI7RN6rkxzYYxaxa5Cv1DsaT5JElEUJB8LCAvimI5L40e0gonC3SnckBKrjRZCflCeEFJ3ihpYEGir_bnDNwvUkgXeecPGJPDO7PQWpy8fGS5QBq1qHWp2HoUD-mF_ruxFMxb-o57YQSkVAqj0me2bkneu2gybhSzLkV6_2d-xoeH27s9lgEJwcO_vFtowUHBjiDxFoq2tlqUyE1cmOaRs20zpnTDKeGhu99c9ySUth3VmKFWvBYxY",
+        "S2C.sigi.BBI7RN6rkxxekIFrowUmLgJxJsJmmedkUmiX0yCy3v5xjsnTdjK8on3-R6SaNj8r33UE6nhimZAmMnRBK21sWVYxNtbhSv7uqrdbKxI0HhSo1T-FZRBNv_Qe1lhWiKunK6HtYbEYeKFhlqvV2H6-cVtVTnqqfvZuJzHi22Y8Fb9zXskXeSXwJIoevwi1CvdyyS0zxZXhskXdgSXOUMPhLW68EMEvvC6NYVFjBmrbiHnJsrT_LEoNow8",
+        "S2C.sigi.BCI7RN6rkxxTswdTdl4xJERGUuJGTwqFmvFVQsTXI06tp_tPLsWT421qvDSc0LBvXf_6ae1XIiuCffALnSh5-4EpcimTcAPMTDmI5W6JkZ01hwNNzUH6qGS1hP2igkRYBbjHBrXoP8efBpHP0hHSVkga3XITJFdufeJ--LEejtzvzH8L-Yt1gB_eJ-h3zqo_"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.DAI7RN6rkxzYYxaxa5Cv1DsaT5JElEUJB8LCAvimI5L40e0gonC3SnckBKrjRZCflCeEFJ3ihpYEGir_bnDNwvUkgXeecPGJPDO7PQWpy8fGS5QBq1qHWp2HoUD-mF_ruxFMxb-o57YQSkVAqj0me2bkneu2gybhSzLkV6_2d-xoeH27s9lgEJwcO_vFtowUHBjiDxFoq2tlqUyE1cmOaRs20zpnTDKeGhu99c9ySUth3VmKFWvBYxY",
+          "index": 1,
+          "total": 3,
+          "flags": 12,
+          "codebook": false,
+          "join": false,
+          "sender": "Steve",
+          "header_hex": "0c023b44deab931c",
+          "mid_hex": "3b44deab931c",
+          "nonce_hex": "d86316b16b90afd43b1a4f92",
+          "aad_hex": "0c023b44deab931c534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "0553746576656162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a616263",
+          "plaintext": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabc"
+        },
+        {
+          "token": "S2C.sigi.BBI7RN6rkxxekIFrowUmLgJxJsJmmedkUmiX0yCy3v5xjsnTdjK8on3-R6SaNj8r33UE6nhimZAmMnRBK21sWVYxNtbhSv7uqrdbKxI0HhSo1T-FZRBNv_Qe1lhWiKunK6HtYbEYeKFhlqvV2H6-cVtVTnqqfvZuJzHi22Y8Fb9zXskXeSXwJIoevwi1CvdyyS0zxZXhskXdgSXOUMPhLW68EMEvvC6NYVFjBmrbiHnJsrT_LEoNow8",
+          "index": 2,
+          "total": 3,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "04123b44deab931c",
+          "mid_hex": "3b44deab931c",
+          "nonce_hex": "5e90816ba305262e027126c2",
+          "aad_hex": "04123b44deab931c534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "6465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162",
+          "plaintext": "defghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijab"
+        },
+        {
+          "token": "S2C.sigi.BCI7RN6rkxxTswdTdl4xJERGUuJGTwqFmvFVQsTXI06tp_tPLsWT421qvDSc0LBvXf_6ae1XIiuCffALnSh5-4EpcimTcAPMTDmI5W6JkZ01hwNNzUH6qGS1hP2igkRYBbjHBrXoP8efBpHP0hHSVkga3XITJFdufeJ--LEejtzvzH8L-Yt1gB_eJ-h3zqo_",
+          "index": 3,
+          "total": 3,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "04223b44deab931c",
+          "mid_hex": "3b44deab931c",
+          "nonce_hex": "53b30753765e3124444652e2",
+          "aad_hex": "04223b44deab931c534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a",
+          "plaintext": "cdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij"
+        }
+      ],
+      "joined": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij",
+      "joined_equals_plaintext": true,
+      "note": "Sender field only in part 1; S=0 on later parts."
+    },
+    {
+      "id": "sender-compact",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": true,
+        "max_line": 256,
+        "sender": "Alex"
+      },
+      "plaintext": "nether roof stash at 0 128 0",
+      "plaintext_utf8_hex": "6e657468657220726f6f662073746173682061742030203132382030",
+      "lines": [
+        "S2C.sigi.CSnHGAxZKe5_i7bRkz8g0EYwtk6KlBBOgySFYAqt1Bj1OBmijVCxqLoU7Q"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.CSnHGAxZKe5_i7bRkz8g0EYwtk6KlBBOgySFYAqt1Bj1OBmijVCxqLoU7Q",
+          "index": 1,
+          "total": 1,
+          "flags": 9,
+          "codebook": true,
+          "join": false,
+          "sender": "Alex",
+          "header_hex": "09",
+          "mid_hex": "",
+          "nonce_hex": "29c7180c5929ee7f8bb6d193",
+          "aad_hex": "09534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "04416c6578c200100604440181c0",
+          "plaintext": "nether roof stash at 0 128 0"
+        }
+      ],
+      "joined": "nether roof stash at 0 128 0",
+      "joined_equals_plaintext": true,
+      "note": "Sender field precedes the codebook body."
+    },
+    {
+      "id": "mixed-case-name",
+      "circle": "mixedcase",
+      "keyring": [
+        "mixedcase"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "case matters in the AAD",
+      "plaintext_utf8_hex": "63617365206d61747465727320696e2074686520414144",
+      "lines": [
+        "S2C.sigi.ABolhTWnyygOBH5RC_vMo2ESYVaHzV93bGnZUbdQOlcGh4_hVQPiftk2UTy_k5JljrmlAA"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.ABolhTWnyygOBH5RC_vMo2ESYVaHzV93bGnZUbdQOlcGh4_hVQPiftk2UTy_k5JljrmlAA",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "1a258535a7cb280e047e510b",
+          "aad_hex": "00534947494c2e76322e432e536967696c2d566563746f722d4d6978656443617365",
+          "payload_hex": "63617365206d61747465727320696e2074686520414144",
+          "plaintext": "case matters in the AAD"
+        }
+      ],
+      "joined": "case matters in the AAD",
+      "joined_equals_plaintext": true,
+      "note": "Circle name is case-preserving in salt and AAD."
+    },
+    {
+      "id": "slug-collision",
+      "circle": "main",
+      "keyring": [
+        "sameslug",
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "tag picks the winner",
+      "plaintext_utf8_hex": "746167207069636b73207468652077696e6e6572",
+      "lines": [
+        "S2C.sigi.AIBATr7sQXK3y-8ojO8ZFz_0UkjUzbPG-8oKWCk_XIGDIxMVWK4MZOW-jcyBPTIEfQ"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.AIBATr7sQXK3y-8ojO8ZFz_0UkjUzbPG-8oKWCk_XIGDIxMVWK4MZOW-jcyBPTIEfQ",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "80404ebeec4172b7cbef288c",
+          "aad_hex": "00534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "746167207069636b73207468652077696e6e6572",
+          "plaintext": "tag picks the winner"
+        }
+      ],
+      "joined": "tag picks the winner",
+      "joined_equals_plaintext": true,
+      "note": "Two circles share slug 'sigi'; the GCM tag decides."
+    },
+    {
+      "id": "buried-in-text",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "coords later",
+      "plaintext_utf8_hex": "636f6f726473206c61746572",
+      "lines": [
+        "check this tome S2C.sigi.AFsAcuJUnrqllq_SWO5PkAcbKsdZ84AbcZM5k5w86VvatU0gHM_MZaY please"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.AFsAcuJUnrqllq_SWO5PkAcbKsdZ84AbcZM5k5w86VvatU0gHM_MZaY",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "5b0072e2549ebaa596afd258",
+          "aad_hex": "00534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "636f6f726473206c61746572",
+          "plaintext": "coords later"
+        }
+      ],
+      "joined": "coords later",
+      "joined_equals_plaintext": true,
+      "note": "Token buried in other text."
+    },
+    {
+      "id": "loose-suffix-ignored",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": "Steve"
+      },
+      "plaintext": "who sent this",
+      "plaintext_utf8_hex": "77686f2073656e742074686973",
+      "lines": [
+        "S2C.sigi.CGMAMm8ATkTR75w7ia9AYQLew82RYNB4vByyXPAs5j9fDiUaUhWon8VmnWjjuG9Y #Mallory"
+      ],
+      "parts": [
+        {
+          "token": "S2C.sigi.CGMAMm8ATkTR75w7ia9AYQLew82RYNB4vByyXPAs5j9fDiUaUhWon8VmnWjjuG9Y",
+          "index": 1,
+          "total": 1,
+          "flags": 8,
+          "codebook": false,
+          "join": false,
+          "sender": "Steve",
+          "header_hex": "08",
+          "mid_hex": "",
+          "nonce_hex": "6300326f004e44d1ef9c3b89",
+          "aad_hex": "08534947494c2e76322e432e736967696c2d766563746f722d74657374",
+          "payload_hex": "05537465766577686f2073656e742074686973",
+          "plaintext": "who sent this"
+        }
+      ],
+      "joined": "who sent this",
+      "joined_equals_plaintext": true,
+      "note": "A loose ' #name' after the token is not part of S2; the sender is the sealed 'Steve'."
+    }
+  ],
+  "negative": [
+    {
+      "id": "tampered-tag",
+      "line": "S2C.sigi.AORQ_odWkqlruj50I4F-vn14pLE7dWaIexxj4lNe0jn-o1pxc2A",
+      "reason": "Last tag byte flipped.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "tampered-ciphertext",
+      "line": "S2C.sigi.AORQ_odWkqlruj50I4B-vn14pLE7dWaIexxj4lNe0jn-o1pxc2E",
+      "reason": "First ciphertext byte flipped.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "tampered-nonce",
+      "line": "S2C.sigi.AOVQ_odWkqlruj50I4F-vn14pLE7dWaIexxj4lNe0jn-o1pxc2E",
+      "reason": "First nonce byte flipped.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "sender-name-tampered",
+      "line": "S2C.sigi.CA-tWP8fEGh39zEuWFO-kmrAfrdrGMUQ_M_IqjDZRxDrsEWrv8q9pjwi9YI",
+      "reason": "First byte of the sealed sender name flipped (inside the ciphertext).",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "sender-flag-cleared",
+      "line": "S2C.sigi.AA-tWP8fEGh39zEuWFO_kmrAfrdrGMUQ_M_IqjDZRxDrsEWrv8q9pjwi9YI",
+      "reason": "S bit cleared: the header is in the AAD.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "sender-flag-set",
+      "line": "S2C.sigi.CORQ_odWkqlruj50I4F-vn14pLE7dWaIexxj4lNe0jn-o1pxc2E",
+      "reason": "S bit set on a token without a sender field.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "z-flag-removed",
+      "line": "S2C.sigi.ADvcTAKVQdhU1WcVI_tZ38izOxEfLqRjFZ-NtSFzYH_J6ehgoGo",
+      "reason": "Z bit cleared on a codebook part. No lenient fallback in S2.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "z-flag-added",
+      "line": "S2C.sigi.AeRQ_odWkqlruj50I4F-vn14pLE7dWaIexxj4lNe0jn-o1pxc2E",
+      "reason": "Z bit set on a raw part. (S1 accepted '.z' added; S2 does not.)",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "join-flag-flipped",
+      "line": "S2C.sigi.BQLgXsY1zzjWQnCzUn_q7_ehKSrhiGpxh8l9TFNv0J78xKHeDw8QApLG2aDmZo9ilI0hqoPF-IRfn6pcZV_eyrDVr4urE6oR3QQG5UjG4cL_WC8V53dvbOCPaj7SYHsLqKn9LsQ95DyWzDZoLbBLlinqJyTpqDHf7803qXUMb1EzCQHuCUeyAewdg253IBwTq6QF_VlFRrKq4MfSWz7bmgsOO2ML2h_-EdsmDXiSNaJ_qgMe9Q",
+      "reason": "J bit cleared on part 1 of a compact message: rejoin info is authenticated.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "join-flag-on-last-part",
+      "line": "S2C.sigi.BiKuNZd3Df-pEYfge3bxU_ALJfHL5a3v_uMZsno2JeqqcQXGgb_H-eoxtGD0uSEiSFiDGcMY-mHpIkix-lYJqjfl6HQdpBxOh4Auma8TU1xrlLIj3jyu5MGP86SAJjcauT7LCRNQb5ZyTY9I5TtMxrXRAWQujQZq9gmq0VyywqRp1Jh1YeNinUAl",
+      "reason": "J set on the last part: rejected before decryption.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "reserved-bit-set",
+      "line": "S2C.sigi.EORQ_odWkqlruj50I4F-vn14pLE7dWaIexxj4lNe0jn-o1pxc2E",
+      "reason": "Reserved header bit set: rejected (future format).",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "fragment-index-relabelled",
+      "line": "S2C.sigi.BBKuNZd3Df9-R7Z6YXdlCs-01A9AWDVAH1yayy8nWveXkgZjovOgMNCjpCgO1H2gVgfsZvjyoPJti7ANVl8aq8riNSN253tKhxcvJjfUON9l6xUoG7S7Izw1bqsbCepCslS7vQq44rdKLHUR2H5Ctizd_vh0VenVbolYqgWUPAZ78p5RfBEk64dy16gBFn-vBE5TUXk08AWd7k2shHDzI1MIR_T2SVZAyzWE5aPNGzPVrHWhD_fSThQ",
+      "reason": "Part 1/3 relabelled 2/3: the part byte is in the AAD.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "fragment-total-relabelled",
+      "line": "S2C.sigi.BAGuNZd3Df9-R7Z6YXdlCs-01A9AWDVAH1yayy8nWveXkgZjovOgMNCjpCgO1H2gVgfsZvjyoPJti7ANVl8aq8riNSN253tKhxcvJjfUON9l6xUoG7S7Izw1bqsbCepCslS7vQq44rdKLHUR2H5Ctizd_vh0VenVbolYqgWUPAZ78p5RfBEk64dy16gBFn-vBE5TUXk08AWd7k2shHDzI1MIR_T2SVZAyzWE5aPNGzPVrHWhD_fSThQ",
+      "reason": "Part 1/3 relabelled 1/2.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "multi-part-as-single",
+      "line": "S2C.sigi.AH5Htnphd2UKz7TUD0BYNUAfXJrLLyda95eSBmOi86Aw0KOkKA7UfaBWB-xm-PKg8m2LsA1WXxqryuI1I3bne0qHFy8mN9Q432XrFSgbtLsjPDVuqxsJ6kKyVLu9Crjit0osdRHYfkK2LN3--HRV6dVuiViqBZQ8BnvynlF8ESTrh3LXqAEWf68ETlNReTTwBZ3uTayEcPMjUwhH9PZJVkDLNYTlo80bM9WsdaEP99JOFA",
+      "reason": "Part 1/3 rewritten as a single-part frame (M cleared, part+mid removed).",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "message-id-rewritten",
+      "line": "S2C.sigi.BBKuNZd3Df-et92y8BQ4H5fCTeTEz5H_hPcdsSS7P_v9QtSUXc9HXYHmYooWaZSsXWQbd7WcJrTjoJV2u2N0u0yUloxu8FyvKDktb9VkK_TQd8gdV1nmUsHzOcMQrIRBEbue7JlHaBiLstXCLS1aZDHox4o8sYSc4RkRoNLZ7CeJkgrfj5gkrYul9NHBPBKGw01xYqa1ZqT3BGvZO8POj1pB55sKzmzwLJyZSnEupSlRyctmUYGSSDA",
+      "reason": "Part 2 of message B given message A's id to splice it into A: the id is in the AAD.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "wrong-passphrase",
+      "line": "S2C.sigi.AF2MwnyzVwNVMgYZgQaP-a7JF_NRhqiIpB8zSAFCufT0vam3i4fG-WE9031eg8AZDAJe738",
+      "reason": "Same name, different passphrase.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "wrong-name-same-slug",
+      "line": "S2C.sigi.ACCDVY4FrexDMeN3qgO3BUFsUitnfrBXQAWUYz1T52s3Fgd8dwX3B6U_Pta7qUHLCg",
+      "reason": "Sealed under 'sigil-vector-other' (same slug, same passphrase); name is in salt and AAD.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "s1-frame-relabelled-s2",
+      "line": "S2C.sigi.33yUOqx5eTve88SErCrm2lqN-KUC3IUTxx46hX5r63qpkq37TCzM",
+      "reason": "An S1 blob presented as S2: different AAD domain (S1 AAD starts 'SIGIL.v1', S2 with the header).",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "slug-unknown",
+      "line": "S2C.qqqq.AORQ_odWkqlruj50I4F-vn14pLE7dWaIexxj4lNe0jn-o1pxc2E",
+      "reason": "Slug matches no circle.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "truncated-blob",
+      "line": "S2C.sigi.AHh4eHh4eHh4eHh4eHh4eHh4eHh4",
+      "reason": "Frame shorter than header + nonce + tag.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "not-sigil",
+      "line": "hello world, nothing sealed here",
+      "reason": "No token.",
+      "keyring": [
+        "main"
+      ]
+    }
+  ],
+  "messages": [
+    {
+      "id": "cross-message-splice",
+      "keyring": [
+        "main"
+      ],
+      "lines": [
+        "S2C.sigi.BAKuNZd3Df9-R7Z6YXdlCs-01A9AWDVAH1yayy8nWveXkgZjovOgMNCjpCgO1H2gVgfsZvjyoPJti7ANVl8aq8riNSN253tKhxcvJjfUON9l6xUoG7S7Izw1bqsbCepCslS7vQq44rdKLHUR2H5Ctizd_vh0VenVbolYqgWUPAZ78p5RfBEk64dy16gBFn-vBE5TUXk08AWd7k2shHDzI1MIR_T2SVZAyzWE5aPNGzPVrHWhD_fSThQ",
+        "S2C.sigi.BBJIKTaXhB6et92y8BQ4H5fCTeTEz5H_hPcdsSS7P_v9QtSUXc9HXYHmYooWaZSsXWQbd7WcJrTjoJV2u2N0u0yUloxu8FyvKDktb9VkK_TQd8gdV1nmUsHzOcMQrIRBEbue7JlHaBiLstXCLS1aZDHox4o8sYSc4RkRoNLZ7CeJkgrfj5gkrYul9NHBPBKGw01xYqa1ZqT3BGvZO8POj1pB55sKzmzwLJyZSnEupSlRyctmUYGSSDA",
+        "S2C.sigi.BCKuNZd3Df-pEYfge3bxU_ALJfHL5a3v_uMZsno2JeqqcQXGgb_H-eoxtGD0uSEiSFiDGcMY-mHpIkix-lYJqjfl6HQdpBxOh4Auma8TU1xrlLIj3jyu5MGP86SAJjcauT7LCRNQb5ZyTY9I5TtMxrXRAWQujQZq9gmq0VyywqRp1Jh1YeNinUAl"
+      ],
+      "complete": [],
+      "reason": "Parts 1 and 3 of message A with part 2 of message B (same n): every line opens, but ids differ, so no complete message may be assembled."
+    },
+    {
+      "id": "two-messages-interleaved",
+      "keyring": [
+        "main"
+      ],
+      "lines": [
+        "S2C.sigi.BAKuNZd3Df9-R7Z6YXdlCs-01A9AWDVAH1yayy8nWveXkgZjovOgMNCjpCgO1H2gVgfsZvjyoPJti7ANVl8aq8riNSN253tKhxcvJjfUON9l6xUoG7S7Izw1bqsbCepCslS7vQq44rdKLHUR2H5Ctizd_vh0VenVbolYqgWUPAZ78p5RfBEk64dy16gBFn-vBE5TUXk08AWd7k2shHDzI1MIR_T2SVZAyzWE5aPNGzPVrHWhD_fSThQ",
+        "S2C.sigi.BAJIKTaXhB6G77Se4D8tB54XHq_nkozBrlV-AbTDyKaX-gwTrfavtAHIQQkkes7ZThzFtymO-ez5Dhe_rpIddjsLenZ_y_wWnvfa_YcpkWZsgUvgdOR5uVgWKL9-fKcgK1ISLWz-nuPHOK4tS7L5xMQR1LdOfqJx_QKXG1UM4oxAd3Uemp2czQttKcS2_kEHc_n9FtKtg2z27nEuh0M1DCPxNSputU9Ux4-OFDgzS7mT9xwOmJALNdw",
+        "S2C.sigi.BBKuNZd3Df8rJtmJG51Ms3VKgr8uaibjlCM4zhL531t838-ZxEeGsTdP5l6Yaeiy834wvMOMpjMkD70BV1xOUeG3HStIYzVJgUdXaErlzjQ2mNFiBRxFTnviqJ05IZJYutFigOocwVmOFJYQMnfIxgOMwHsW2oDXgxiuHdakV2L0rPVgzfB67MpNuQsX27BF7wdwfm5pGPMMWGNeMVfqW_8XBNtql1Ngc-v35dL_tG-KK7kr9EnmBbE",
+        "S2C.sigi.BBJIKTaXhB6et92y8BQ4H5fCTeTEz5H_hPcdsSS7P_v9QtSUXc9HXYHmYooWaZSsXWQbd7WcJrTjoJV2u2N0u0yUloxu8FyvKDktb9VkK_TQd8gdV1nmUsHzOcMQrIRBEbue7JlHaBiLstXCLS1aZDHox4o8sYSc4RkRoNLZ7CeJkgrfj5gkrYul9NHBPBKGw01xYqa1ZqT3BGvZO8POj1pB55sKzmzwLJyZSnEupSlRyctmUYGSSDA",
+        "S2C.sigi.BCKuNZd3Df-pEYfge3bxU_ALJfHL5a3v_uMZsno2JeqqcQXGgb_H-eoxtGD0uSEiSFiDGcMY-mHpIkix-lYJqjfl6HQdpBxOh4Auma8TU1xrlLIj3jyu5MGP86SAJjcauT7LCRNQb5ZyTY9I5TtMxrXRAWQujQZq9gmq0VyywqRp1Jh1YeNinUAl",
+        "S2C.sigi.BCJIKTaXhB6424V7RCKCeCROV5YtC5jA97YocxxgqQLeihh5bInLwzTohb9Cx52GSO_1bjk3E880_W1Xt88OnCKIJEaQFV2FhdJbdq2cTGHUTZTwPWggbxZtx5UiAki93-YjOYdvHTrk59GghAR2cNQIcSx5yp4rEI5kby8qVWuVXGqQmQ-TA__P"
+      ],
+      "complete": [
+        "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij",
+        "klmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrstklmnopqrst"
+      ],
+      "reason": "Interleaved parts of two messages regroup by message id."
+    },
+    {
+      "id": "duplicate-part-ignored",
+      "keyring": [
+        "main"
+      ],
+      "lines": [
+        "S2C.sigi.BAKuNZd3Df9-R7Z6YXdlCs-01A9AWDVAH1yayy8nWveXkgZjovOgMNCjpCgO1H2gVgfsZvjyoPJti7ANVl8aq8riNSN253tKhxcvJjfUON9l6xUoG7S7Izw1bqsbCepCslS7vQq44rdKLHUR2H5Ctizd_vh0VenVbolYqgWUPAZ78p5RfBEk64dy16gBFn-vBE5TUXk08AWd7k2shHDzI1MIR_T2SVZAyzWE5aPNGzPVrHWhD_fSThQ",
+        "S2C.sigi.BAKuNZd3Df9-R7Z6YXdlCs-01A9AWDVAH1yayy8nWveXkgZjovOgMNCjpCgO1H2gVgfsZvjyoPJti7ANVl8aq8riNSN253tKhxcvJjfUON9l6xUoG7S7Izw1bqsbCepCslS7vQq44rdKLHUR2H5Ctizd_vh0VenVbolYqgWUPAZ78p5RfBEk64dy16gBFn-vBE5TUXk08AWd7k2shHDzI1MIR_T2SVZAyzWE5aPNGzPVrHWhD_fSThQ",
+        "S2C.sigi.BBKuNZd3Df8rJtmJG51Ms3VKgr8uaibjlCM4zhL531t838-ZxEeGsTdP5l6Yaeiy834wvMOMpjMkD70BV1xOUeG3HStIYzVJgUdXaErlzjQ2mNFiBRxFTnviqJ05IZJYutFigOocwVmOFJYQMnfIxgOMwHsW2oDXgxiuHdakV2L0rPVgzfB67MpNuQsX27BF7wdwfm5pGPMMWGNeMVfqW_8XBNtql1Ngc-v35dL_tG-KK7kr9EnmBbE",
+        "S2C.sigi.BCKuNZd3Df-pEYfge3bxU_ALJfHL5a3v_uMZsno2JeqqcQXGgb_H-eoxtGD0uSEiSFiDGcMY-mHpIkix-lYJqjfl6HQdpBxOh4Auma8TU1xrlLIj3jyu5MGP86SAJjcauT7LCRNQb5ZyTY9I5TtMxrXRAWQujQZq9gmq0VyywqRp1Jh1YeNinUAl"
+      ],
+      "complete": [
+        "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij"
+      ],
+      "reason": "A replayed part is ignored, not joined twice."
+    },
+    {
+      "id": "missing-part",
+      "keyring": [
+        "main"
+      ],
+      "lines": [
+        "S2C.sigi.BAKuNZd3Df9-R7Z6YXdlCs-01A9AWDVAH1yayy8nWveXkgZjovOgMNCjpCgO1H2gVgfsZvjyoPJti7ANVl8aq8riNSN253tKhxcvJjfUON9l6xUoG7S7Izw1bqsbCepCslS7vQq44rdKLHUR2H5Ctizd_vh0VenVbolYqgWUPAZ78p5RfBEk64dy16gBFn-vBE5TUXk08AWd7k2shHDzI1MIR_T2SVZAyzWE5aPNGzPVrHWhD_fSThQ",
+        "S2C.sigi.BCKuNZd3Df-pEYfge3bxU_ALJfHL5a3v_uMZsno2JeqqcQXGgb_H-eoxtGD0uSEiSFiDGcMY-mHpIkix-lYJqjfl6HQdpBxOh4Auma8TU1xrlLIj3jyu5MGP86SAJjcauT7LCRNQb5ZyTY9I5TtMxrXRAWQujQZq9gmq0VyywqRp1Jh1YeNinUAl"
+      ],
+      "complete": [],
+      "reason": "Part 2/3 missing: nothing is assembled."
+    }
+  ]
+}

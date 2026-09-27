@@ -19,6 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 VECTORS = ROOT / "tests" / "vectors" / "s1c.json"
+VECTORS_S2 = ROOT / "tests" / "vectors" / "s2c.json"
 
 _TMP = tempfile.TemporaryDirectory(prefix="sigil-vectors-test-")
 os.environ["SIGIL_HOME"] = _TMP.name
@@ -115,6 +116,99 @@ class S1CVectors(unittest.TestCase):
                 self.use_keyring(vec["keyring"])
                 with self.assertRaises(Exception):
                     sigil.open_line(vec["line"])
+
+
+class S2CVectors(unittest.TestCase):
+    """tests/vectors/s2c.json: S2 frame header, message id, sender, exact rejoin."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.v = json.loads(VECTORS_S2.read_text(encoding="utf-8"))
+        cls.circles = {c["id"]: c for c in cls.v["circles"]}
+        cls.tmp = tempfile.TemporaryDirectory(prefix="sigil-vectors-s2-test-")
+        cls.saved_home = sigil.HOME
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        sigil.HOME = cls.saved_home
+        cls.tmp.cleanup()
+
+    def use_keyring(self, ids: list[str]) -> None:
+        sigil.HOME = Path(self.tmp.name)
+        for f in Path(self.tmp.name).glob("circle-*.json"):
+            f.unlink()
+        for cid in ids:
+            c = self.circles[cid]
+            sigil.circle_create(c["name"], c["passphrase"], note="public test vector - not a key")
+
+    def test_header(self) -> None:
+        self.assertIn("PUBLIC TEST-ONLY", self.v["WARNING"])
+        self.assertEqual(self.v["protocol"], sigil.VERSION2)
+        self.assertEqual(self.v["aad_prefix"], sigil.PROTOCOL2)
+        self.assertEqual(self.v["kdf"]["iterations"], sigil.PBKDF2_ITERS)
+        for c in self.v["circles"]:
+            self.assertIn("DO-NOT-USE", c["passphrase"])
+            self.assertEqual(sigil.derive_circle_key(c["name"], c["passphrase"]).hex(), c["key_hex"])
+
+    def test_positive_open_and_rejoin(self) -> None:
+        for vec in self.v["positive"]:
+            with self.subTest(vector=vec["id"]):
+                self.use_keyring(vec["keyring"])
+                got = [sigil.open_line(line) for line in vec["lines"]]
+                for r, part in zip(got, vec["parts"], strict=True):
+                    self.assertEqual(r["version"], 2)
+                    self.assertEqual(r["part"], f"{part['index']}/{part['total']}")
+                    self.assertEqual(r["plaintext"], part["plaintext"])
+                    self.assertEqual(r["join"], part["join"])
+                    self.assertEqual(r["codebook"], part["codebook"])
+                    self.assertEqual(r["sender"], part["sender"])
+                    self.assertEqual(r["mid"], part["mid_hex"])
+                msgs = sigil.assemble_messages(got)
+                self.assertEqual(len(msgs), 1)
+                self.assertTrue(msgs[0]["complete"])
+                self.assertEqual(msgs[0]["text"], vec["joined"])
+                if not vec["seal"]["compact"]:
+                    self.assertEqual(vec["joined"], vec["plaintext"])  # raw S2 is exact
+                else:
+                    self.assertEqual(vec["joined"].lower(), vec["plaintext"].lower())  # exact up to case
+                self.assertEqual(vec["joined"] == vec["plaintext"], vec["joined_equals_plaintext"])
+                if vec["seal"]["sender"]:
+                    self.assertEqual(got[0]["sender"], vec["seal"]["sender"])
+                    self.assertTrue(all(r["sender"] is None for r in got[1:]))
+
+    def test_positive_bytes(self) -> None:
+        """Header + nonce + AAD + payload re-seal to the exact recorded token."""
+        for vec in self.v["positive"]:
+            c = self.circles[vec["circle"]]
+            key = bytes.fromhex(c["key_hex"])
+            for part in vec["parts"]:
+                with self.subTest(vector=vec["id"], part=part["index"]):
+                    header = bytes.fromhex(part["header_hex"])
+                    mid = bytes.fromhex(part["mid_hex"])
+                    flags = part["flags"] & ~sigil.S2_M
+                    self.assertEqual(sigil.s2_header(flags, part["index"], part["total"], mid), header)
+                    aad = header + sigil.s2_context("C", c["name"])
+                    self.assertEqual(aad.hex(), part["aad_hex"])
+                    nonce, payload = bytes.fromhex(part["nonce_hex"]), bytes.fromhex(part["payload_hex"])
+                    blob = sigil.b64e(header + nonce + AESGCM(key).encrypt(nonce, payload, aad))
+                    self.assertEqual(f"S2C.{c['slug']}.{blob}", part["token"])
+                    sender, text = sigil.s2_unpack_plaintext(part["flags"], payload)
+                    self.assertEqual((sender, text), (part["sender"], part["plaintext"]))
+
+    def test_negative(self) -> None:
+        for vec in self.v["negative"]:
+            with self.subTest(vector=vec["id"]):
+                self.use_keyring(vec["keyring"])
+                with self.assertRaises(Exception):
+                    sigil.open_line(vec["line"])
+
+    def test_messages(self) -> None:
+        for vec in self.v["messages"]:
+            with self.subTest(vector=vec["id"]):
+                self.use_keyring(vec["keyring"])
+                opened = [sigil.open_line(line) for line in vec["lines"]]
+                complete = sorted(m["text"] for m in sigil.assemble_messages(opened) if m["complete"])
+                self.assertEqual(complete, sorted(vec["complete"]))
 
 
 if __name__ == "__main__":

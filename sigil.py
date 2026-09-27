@@ -4,8 +4,9 @@ SIGIL — Sealed In-the-open Glyphs for Informal Links
 A public-facing encryption system for open chats and whispers
 (Minecraft, Discord, IRC, SMS, carrier pigeon).
 
-Protocol version: S1
-This file is both the reference implementation and the CLI.
+Protocol versions: S2 (default for sealing) and S1 (still opened; seal
+with --wire S1 for old peers). This file is both the reference
+implementation and the CLI.
 """
 
 from __future__ import annotations
@@ -29,6 +30,10 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 import codebook
 
+__version__ = "0.4.0"
+
+# S1 constants. PROTOCOL also names the circle-key salt, which S2 reuses
+# unchanged (same keys, same keyrings). S2 constants live in the S2 section.
 VERSION = "S1"
 PROTOCOL = "SIGIL.v1"
 PBKDF2_ITERS = 210_000
@@ -520,6 +525,9 @@ def seal_to_signet(
     return lines
 
 
+_TOKEN_HEADS = ("S1C.", "S1K.", "S1E.", "S2C.", "S2K.", "S2E.")
+
+
 def open_line(line: str) -> dict:
     """
     Attempt to decrypt a single SIGIL line against the local keyring.
@@ -528,9 +536,11 @@ def open_line(line: str) -> dict:
     raw = line.strip()
     # Allow wrapping like: [Sigil] S1C.xxxx.yyyy
     for token in raw.replace(",", " ").split():
-        if token.startswith("S1C.") or token.startswith("S1K.") or token.startswith("S1E."):
+        if token[:4] in _TOKEN_HEADS:
             raw = token
             break
+    if raw.startswith(VERSION2):
+        return open_line_s2(raw)
     parts = raw.split(".")
     if len(parts) < 3 or not parts[0].startswith("S1"):
         raise ValueError("Not a SIGIL S1 message.")
@@ -668,22 +678,377 @@ def _codebook_boundary_space(left: str, right: str) -> bool:
     return (a.isalnum() and b.isalnum()) or (a in ".,:;?!" and b.isalnum())
 
 
-def stitch_parts(parts: list[tuple[str, bool]]) -> str:
+def stitch_parts(parts: list[tuple]) -> str:
     """
-    Join decoded fragments, already in i/n order: [(plaintext, codebook), ...].
+    Join decoded fragments, already in i/n order.
 
-    Raw parts are exact UTF-8 slices (the plain chunker cuts mid-word), so a
-    raw|raw boundary is concatenated byte-exact. Only a boundary next to a
-    codebook-decoded part gets whitespace restored.
+    S1 items are (plaintext, codebook). Raw parts are exact UTF-8 slices (the
+    plain chunker cuts mid-word), so a raw|raw boundary is concatenated
+    byte-exact. Only a boundary next to a codebook-decoded part gets
+    whitespace restored, heuristically (see _codebook_boundary_space).
+
+    S2 items are (plaintext, codebook, join). The authenticated J flag says
+    whether exactly one space follows the part, so S2 is exact: no heuristic.
     """
     joined = ""
     prev_codebook = False
-    for k, (text, used_codebook) in enumerate(parts):
+    for k, item in enumerate(parts):
+        text, used_codebook = item[0], item[1]
+        join = item[2] if len(item) > 2 else None
+        if join is not None:
+            joined += text + (" " if join else "")
+            continue
         if k and (prev_codebook or used_codebook) and _codebook_boundary_space(joined, text):
             joined += " "
         joined += text
         prev_codebook = used_codebook
     return joined
+
+
+# ---------------------------------------------------------------------------
+# S2 wire format (see README "Wire format S2"). Same primitives and keys as
+# S1: AES-256-GCM, PBKDF2-HMAC-SHA256 circle keys, ECDH P-256 + HKDF-SHA256.
+# What S2 adds: an authenticated binary frame header carrying the codebook
+# flag, an exact rejoin flag, i/n and a random message id, plus an optional
+# sender field inside the ciphertext.
+# ---------------------------------------------------------------------------
+
+VERSION2 = "S2"
+PROTOCOL2 = "SIGIL.v2"
+S2_Z = 0x01         # body is a codebook v2 stream
+S2_J = 0x02         # rejoin: exactly one U+0020 follows this part's text
+S2_M = 0x04         # multi-part: part byte + message id follow the flags byte
+S2_S = 0x08         # plaintext starts with a sender field (part 1 only)
+S2_RESERVED = 0xF0  # must be zero
+S2_MID_LEN = 6      # 48-bit random message id (multi-part only)
+S2_MAX_PARTS = 16
+S2_MAX_SENDER = 32  # bytes of UTF-8
+S2_KINDS = ("C", "K", "E")
+DEFAULT_WIRE = os.environ.get("SIGIL_WIRE", "S2").strip().upper() or "S2"
+
+
+def _b64_room(chars: int) -> int:
+    """Largest byte count whose unpadded base64url fits in `chars` characters."""
+    if chars <= 0:
+        return 0
+    return (chars // 4) * 3 + max(0, chars % 4 - 1)
+
+
+def s2_header(flags: int, index: int, total: int, mid: bytes = b"") -> bytes:
+    """Frame header bytes: flags [part mid]. These bytes start every AAD."""
+    if flags & (S2_RESERVED | S2_M):
+        raise ValueError("s2_header: flags must not carry reserved or M bits")
+    if total == 1:
+        if index != 1 or mid:
+            raise ValueError("single-part S2 frame has no part field or message id")
+        return bytes([flags])
+    if not (2 <= total <= S2_MAX_PARTS and 1 <= index <= total) or len(mid) != S2_MID_LEN:
+        raise ValueError("bad S2 part field")
+    return bytes([flags | S2_M, ((index - 1) << 4) | (total - 1)]) + mid
+
+
+def s2_parse_frame(data: bytes, ephemeral: bool = False) -> dict:
+    """Split an S2 frame into header fields, eph key, nonce and ciphertext."""
+    if not data:
+        raise ValueError("Empty S2 blob.")
+    flags = data[0]
+    if flags & S2_RESERVED:
+        raise ValueError("S2 header sets reserved bits (newer format?).")
+    pos, index, total, mid = 1, 1, 1, b""
+    if flags & S2_M:
+        if len(data) < 2 + S2_MID_LEN:
+            raise ValueError("S2 blob truncated.")
+        index, total = (data[1] >> 4) + 1, (data[1] & 0x0F) + 1
+        if total < 2 or index > total:
+            raise ValueError("Bad S2 part field.")
+        mid = data[2:2 + S2_MID_LEN]
+        pos = 2 + S2_MID_LEN
+    if flags & S2_J and index == total:
+        raise ValueError("S2 join flag set on the last part.")
+    if flags & S2_S and index != 1:
+        raise ValueError("S2 sender flag set on a part other than 1.")
+    header = data[:pos]
+    eph = b""
+    if ephemeral:
+        eph = data[pos:pos + P256_COMPRESSED_LEN]
+        pos += P256_COMPRESSED_LEN
+    nonce, ct = data[pos:pos + NONCE_LEN], data[pos + NONCE_LEN:]
+    if len(eph) != (P256_COMPRESSED_LEN if ephemeral else 0) or len(nonce) != NONCE_LEN or len(ct) < TAG_LEN:
+        raise ValueError("S2 blob truncated.")
+    return {"flags": flags, "index": index, "total": total, "mid": mid,
+            "header": header, "eph": eph, "nonce": nonce, "ct": ct}
+
+
+def s2_context(kind: str, *route: str) -> bytes:
+    """UTF-8 'SIGIL.v2.<kind>.<route...>'. AAD = header || context."""
+    return f"{PROTOCOL2}.{kind}.{'.'.join(route)}".encode("utf-8")
+
+
+def _s2_body(text: str, compact: bool) -> tuple[bytes, bool]:
+    """
+    Sealer policy (not part of the wire format): a part uses the codebook
+    only if it shrinks AND expands back to the same text up to letter case.
+    Parts the codebook would reshape (dropped/inserted spaces, long tokens,
+    '_' vs ' ') go out raw, so S2 compact is exact except that dictionary
+    words may come back lowercase.
+    """
+    raw = text.encode("utf-8")
+    if compact:
+        packed, used = codebook.maybe_compress(text)
+        if used and codebook.expand_v2(packed).lower() == text.lower():
+            return packed, True
+    return raw, False
+
+
+def _s2_sender_field(sender: str) -> bytes:
+    if not sender:
+        return b""
+    raw = sender.encode("utf-8")
+    if len(raw) > S2_MAX_SENDER:
+        raise ValueError(f"Sender name is longer than {S2_MAX_SENDER} UTF-8 bytes.")
+    return bytes([len(raw)]) + raw
+
+
+def s2_payload_room(max_line: int, prefix_len: int, multi: bool, eph_len: int = 0) -> int:
+    """Plaintext bytes (sender field + body) that fit one S2 line."""
+    header = 2 + S2_MID_LEN if multi else 1
+    return _b64_room(max_line - prefix_len) - header - eph_len - NONCE_LEN - TAG_LEN
+
+
+def s2_split(
+    text: str, compact: bool, sender: str, max_line: int, prefix_len: int, eph_len: int = 0
+) -> list[tuple[str, bool]]:
+    """
+    Cut text into (part_text, join) pairs that fit S2 lines. Rejoining is
+    exact by construction: text == "".join(p + (" " if j else "") ...).
+    Compact mode prefers to cut at a space and consumes it (join=True), so
+    the codebook never has to carry boundary whitespace; otherwise a part is
+    cut mid-word (join=False), which is still exact.
+    """
+    sfield = len(_s2_sender_field(sender))
+    single = s2_payload_room(max_line, prefix_len, False, eph_len)
+    if sfield + len(_s2_body(text, compact)[0]) <= single:
+        return [(text, False)]
+    room = s2_payload_room(max_line, prefix_len, True, eph_len)
+    if room - sfield < 8:
+        raise ValueError("max_line is too small for an S2 fragment.")
+
+    def size(s: str) -> int:
+        return len(_s2_body(s, compact)[0])
+
+    parts: list[tuple[str, bool]] = []
+    rest = text
+    while rest:
+        budget = room - (sfield if not parts else 0)
+        # No codebook token packs more than ~12 characters per byte; the cap
+        # only keeps the search cheap (a smaller part is still correct).
+        span = min(len(rest), budget * 12)
+        if span == len(rest) and size(rest) <= budget:
+            parts.append((rest, False))
+            break
+        lo, hi, best = 1, span, 0
+        while lo <= hi:
+            mid = (lo + hi) // 2
+            if size(rest[:mid]) <= budget:
+                best, lo = mid, mid + 1
+            else:
+                hi = mid - 1
+        if best == 0:
+            raise ValueError("max_line is too small for an S2 fragment.")
+        cut, join = best, False
+        if compact:
+            floor = max(1, best // 2)
+            c = rest.rfind(" ", floor, best + 1)
+            while c >= floor and size(rest[:c]) > budget:
+                c = rest.rfind(" ", floor, c)
+            # Never consume the final character: J must be 0 on the last part.
+            if c >= floor and c + 1 < len(rest):
+                cut, join = c, True
+        parts.append((rest[:cut], join))
+        rest = rest[cut + (1 if join else 0):]
+    if len(parts) > S2_MAX_PARTS:
+        raise ValueError(
+            f"S2 carries at most {S2_MAX_PARTS} parts; this message needs {len(parts)}. "
+            "Shorten it, raise --max-line, or use --wire S1."
+        )
+    return parts
+
+
+def s2_frames(
+    text: str, compact: bool, sender: str, max_line: int, prefix_len: int, eph_len: int = 0
+) -> list[tuple[bytes, bytes]]:
+    """Return (header, plaintext) per part, ready for AES-GCM."""
+    parts = s2_split(text, compact, sender, max_line, prefix_len, eph_len)
+    total = len(parts)
+    mid = os.urandom(S2_MID_LEN) if total > 1 else b""
+    out = []
+    for i, (part, join) in enumerate(parts, start=1):
+        body, used_z = _s2_body(part, compact)
+        flags = (S2_Z if used_z else 0) | (S2_J if join else 0)
+        sfield = b""
+        if i == 1 and sender:
+            flags |= S2_S
+            sfield = _s2_sender_field(sender)
+        out.append((s2_header(flags, i, total, mid), sfield + body))
+    return out
+
+
+def s2_unpack_plaintext(flags: int, pt: bytes) -> tuple[Optional[str], str]:
+    """Plaintext -> (sender or None, part text)."""
+    sender = None
+    if flags & S2_S:
+        n = pt[0] if pt else 0
+        if not 1 <= n <= S2_MAX_SENDER or len(pt) < 1 + n:
+            raise ValueError("Bad S2 sender field.")
+        sender, pt = pt[1:1 + n].decode("utf-8"), pt[1 + n:]
+    if flags & S2_Z:
+        if pt[:1] != codebook.MAGIC2:
+            raise ValueError("S2 codebook body does not start with the v2 magic byte.")
+        return sender, codebook.expand_v2(pt)
+    return sender, pt.decode("utf-8")
+
+
+def _s2_check_lines(lines: list[str], max_line: int) -> list[str]:
+    for line in lines:
+        if len(line) > max_line:  # budgets are exact; this is a guard, not a code path
+            raise AssertionError(f"S2 line {len(line)} > max_line {max_line}")
+    return lines
+
+
+def seal_circle_s2(
+    circle: dict, plaintext: str, sender: str = "", max_line: int = 256, compact: bool = False
+) -> list[str]:
+    key = derive_circle_key(circle["name"], circle["passphrase"])
+    prefix = f"{VERSION2}C.{circle['slug']}."
+    ctx = s2_context("C", circle["name"])
+    lines = []
+    for header, pt in s2_frames(plaintext, compact, sender, max_line, len(prefix)):
+        nonce = os.urandom(NONCE_LEN)
+        ct = AESGCM(key).encrypt(nonce, pt, header + ctx)
+        lines.append(prefix + b64e(header + nonce + ct))
+    return _s2_check_lines(lines, max_line)
+
+
+def seal_to_signet_s2(
+    local: dict,
+    contact: dict,
+    plaintext: str,
+    ephemeral: bool = False,
+    max_line: int = 256,
+    compact: bool = False,
+    sender: str = "",
+) -> list[str]:
+    their_pk = _pk_from_b64(contact["pk"])
+    their_pk_b = _pk_bytes(their_pk)
+    to_short = contact["short"]
+    lines = []
+    if ephemeral:
+        prefix = f"{VERSION2}E.{to_short}."
+        ctx = s2_context("E", to_short)
+        for header, pt in s2_frames(plaintext, compact, sender, max_line, len(prefix), P256_COMPRESSED_LEN):
+            eph = ec.generate_private_key(ec.SECP256R1())
+            eph_pk = _pk_bytes(eph.public_key())
+            key = ecdh_key(eph, their_pk, ctx + eph_pk + their_pk_b)
+            nonce = os.urandom(NONCE_LEN)
+            ct = AESGCM(key).encrypt(nonce, pt, header + ctx)
+            lines.append(prefix + b64e(header + eph_pk + nonce + ct))
+    else:
+        my_sk = _sk_from_pem(local["sk_pem"])
+        my_pk_b = _pk_bytes(my_sk.public_key())
+        prefix = f"{VERSION2}K.{to_short}.{local['short']}."
+        ctx = s2_context("K", local["short"], to_short)
+        key = ecdh_key(my_sk, their_pk, ctx + my_pk_b + their_pk_b)
+        for header, pt in s2_frames(plaintext, compact, sender, max_line, len(prefix)):
+            nonce = os.urandom(NONCE_LEN)
+            ct = AESGCM(key).encrypt(nonce, pt, header + ctx)
+            lines.append(prefix + b64e(header + nonce + ct))
+    return _s2_check_lines(lines, max_line)
+
+
+def open_line_s2(token: str) -> dict:
+    """Open one bare S2 token against the local keyring (raises ValueError)."""
+    fields = token.split(".")
+    kind = fields[0][2:]
+    if fields[0][:2] != VERSION2 or kind not in S2_KINDS or len(fields) < 3:
+        raise ValueError("Not a SIGIL S2 message.")
+    route, blob = fields[1:-1], fields[-1]
+    try:
+        data = b64d(blob)
+    except Exception:
+        raise ValueError("S2 blob is not base64url.")
+    fr = s2_parse_frame(data, ephemeral=(kind == "E"))
+    base = {
+        "ok": True,
+        "version": 2,
+        "part": f"{fr['index']}/{fr['total']}",
+        "mid": fr["mid"].hex(),
+        "join": bool(fr["flags"] & S2_J),
+        "compact": bool(fr["flags"] & S2_Z),
+        "codebook": bool(fr["flags"] & S2_Z),
+    }
+
+    def finish(pt: bytes, extra: dict) -> dict:
+        sender, text = s2_unpack_plaintext(fr["flags"], pt)
+        out = dict(base, **extra)
+        out["sender"] = sender
+        out["plaintext"] = text
+        return out
+
+    if kind == "C":
+        if len(route) != 1:
+            raise ValueError("S2 circle token needs exactly one slug.")
+        slug = route[0]
+        for circle in list_circles():
+            if circle["slug"] != slug and circle["name"].lower() != slug:
+                continue
+            key = derive_circle_key(circle["name"], circle["passphrase"])
+            aad = fr["header"] + s2_context("C", circle["name"])
+            try:
+                pt = AESGCM(key).decrypt(fr["nonce"], fr["ct"], aad)
+            except Exception:
+                continue
+            return finish(pt, {"mode": "circle", "circle": circle["name"], "slug": circle["slug"]})
+        raise ValueError(f"Could not open circle message for slug '{slug}'. Wrong circle or passphrase.")
+
+    if kind == "K":
+        if len(route) != 2:
+            raise ValueError("S2 signet token needs <to>.<from>.")
+        to_short, from_short = route
+        local = next((s for s in list_signets() if s["short"] == to_short), None)
+        if local is None:
+            raise ValueError(f"Directed at signet {to_short}, which is not on this keyring.")
+        try:
+            contact = find_contact(from_short)
+        except SystemExit:
+            raise ValueError(f"Sender {from_short} is not in your contact book. Import their public signet first.")
+        my_sk = _sk_from_pem(local["sk_pem"])
+        their_pk = _pk_from_b64(contact["pk"])
+        ctx = s2_context("K", from_short, to_short)
+        key = ecdh_key(my_sk, their_pk, ctx + _pk_bytes(their_pk) + _pk_bytes(my_sk.public_key()))
+        pt = AESGCM(key).decrypt(fr["nonce"], fr["ct"], fr["header"] + ctx)
+        return finish(pt, {"mode": "signet", "to": local["name"],
+                           "from": contact.get("name_hint", from_short)})
+
+    # kind == "E"
+    if len(route) != 1:
+        raise ValueError("S2 ephemeral token needs exactly one recipient short-id.")
+    to_short = route[0]
+    local = next((s for s in list_signets() if s["short"] == to_short), None)
+    if local is None:
+        raise ValueError(f"Ephemeral packet is for {to_short}, not on this keyring.")
+    my_sk = _sk_from_pem(local["sk_pem"])
+    eph_pk = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), fr["eph"])
+    ctx = s2_context("E", to_short)
+    key = ecdh_key(my_sk, eph_pk, ctx + fr["eph"] + _pk_bytes(my_sk.public_key()))
+    pt = AESGCM(key).decrypt(fr["nonce"], fr["ct"], fr["header"] + ctx)
+    return finish(pt, {"mode": "ephemeral", "to": local["name"], "from": "ephemeral-sender"})
+
+
+def s2_capacity(mode: str, max_line: int = 256, multi: bool = False, slug_len: int = 4) -> int:
+    """Exact plaintext bytes per S2 line (no sender field)."""
+    prefix = {"C": 5 + slug_len, "K": 14, "E": 9}[mode]
+    eph = P256_COMPRESSED_LEN if mode == "E" else 0
+    return max(0, s2_payload_room(max_line, prefix, multi, eph))
 
 
 def open_messages(text: str) -> list[dict]:
@@ -823,9 +1188,13 @@ def build_parser() -> argparse.ArgumentParser:
     seal.add_argument("message", nargs="?", help="Message text (or stdin)")
     seal.add_argument("-c", "--circle", help="Circle name")
     seal.add_argument("-to", "--to", help="Contact alias or short-id")
-    seal.add_argument("-from", "--sender", default="", help="Alias bound into circle AAD")
+    seal.add_argument("-from", "--sender", default="",
+                      help="Sender name. S2: sealed inside part 1 (authenticated, but any circle member "
+                           "can claim any name). S1: loose ' #name' suffix, not authenticated")
+    seal.add_argument("--wire", choices=["S1", "S2", "s1", "s2"], default=None,
+                      help="Wire format to emit (default S2, or $SIGIL_WIRE). Use S1 for old peers")
     seal.add_argument("--from-signet", default="", help="Which local signet to send as (signet mode)")
-    seal.add_argument("--ephemeral", action="store_true", help="Use a one-time key (S1E, forward secrecy)")
+    seal.add_argument("--ephemeral", action="store_true", help="Use a one-time key (S2E/S1E, forward secrecy)")
     seal.add_argument("--max-line", type=int, default=256, help="Channel character limit (Minecraft=256)")
     seal.add_argument(
         "--compact",
@@ -997,35 +1366,95 @@ def cmd_seal(args: argparse.Namespace) -> None:
         raise SystemExit("No message given.")
     if args.circle and args.to:
         raise SystemExit("Use either --circle or --to, not both.")
-    if args.circle:
-        circle = load_circle(args.circle)
-        lines = seal_circle(
-            circle,
-            msg,
-            sender=args.sender or "anon",
-            max_line=args.max_line,
-            compact=args.compact,
-        )
-    elif args.to:
-        signets = list_signets()
-        if not signets:
-            raise SystemExit("Create a local signet first: sigil signet new YourName")
-        local = load_signet(args.from_signet) if args.from_signet else signets[0]
-        contact = find_contact(args.to)
-        lines = seal_to_signet(
-            local,
-            contact,
-            msg,
-            ephemeral=args.ephemeral,
-            max_line=args.max_line,
-            compact=args.compact,
-        )
-    else:
-        raise SystemExit("Specify --circle NAME or --to CONTACT")
+    wire = (args.wire or DEFAULT_WIRE).upper()
+    if wire not in ("S1", "S2"):
+        raise SystemExit(f"Unknown wire format '{wire}'. Use S2 (default) or S1.")
+    try:
+        if args.circle:
+            circle = load_circle(args.circle)
+            if wire == "S2":
+                lines = seal_circle_s2(circle, msg, sender=args.sender, max_line=args.max_line,
+                                       compact=args.compact)
+            else:
+                lines = seal_circle(circle, msg, sender=args.sender or "anon", max_line=args.max_line,
+                                    compact=args.compact)
+        elif args.to:
+            signets = list_signets()
+            if not signets:
+                raise SystemExit("Create a local signet first: sigil signet new YourName")
+            local = load_signet(args.from_signet) if args.from_signet else signets[0]
+            contact = find_contact(args.to)
+            if wire == "S2":
+                lines = seal_to_signet_s2(local, contact, msg, ephemeral=args.ephemeral,
+                                          max_line=args.max_line, compact=args.compact, sender=args.sender)
+            else:
+                lines = seal_to_signet(local, contact, msg, ephemeral=args.ephemeral,
+                                       max_line=args.max_line, compact=args.compact)
+        else:
+            raise SystemExit("Specify --circle NAME or --to CONTACT")
+    except ValueError as e:
+        raise SystemExit(str(e))
     for line in lines:
         print(line)
         if len(line) > args.max_line:
             print(f"# warning: line length {len(line)} exceeds --max-line {args.max_line}", file=sys.stderr)
+
+
+def _open_meta(r: dict, tail: str) -> str:
+    meta = f"[{r['mode']}"
+    if r["mode"] == "circle":
+        meta += f" {r['circle']}"
+        try:
+            fp = load_circle(r["circle"])["fingerprint"]
+            meta += f" fp={fp} {speak_fingerprint(fp)}"
+        except (Exception, SystemExit):
+            pass
+    else:
+        meta += f" {r.get('from','?')} -> {r.get('to','?')}"
+    if r.get("sender"):
+        # S2 sender field: authenticated as "written by a key holder". In a
+        # circle any member can claim any name; only S2K/S1K prove identity.
+        note = {"circle": " (circle member claim)", "ephemeral": " (unverified claim)"}.get(r["mode"], "")
+        meta += f" sender={r['sender']}{note}"
+    return f"{meta} {tail}]"
+
+
+def assemble_messages(opened: list[dict]) -> list[dict]:
+    """
+    Group opened parts into messages, in first-seen order. Each entry:
+    {"complete": bool, "n": int, "version": 1|2, "parts": [results by index],
+     "missing": [indexes], "text": stitched text or None}.
+    S2 parts are grouped by their authenticated message id, so parts of two
+    different messages never combine. A replayed duplicate part is ignored.
+    """
+    groups: dict[tuple, dict] = {}
+    for r in opened:
+        i, n = 1, 1
+        part = r.get("part") or "1/1"
+        if "/" in part:
+            a, b = part.split("/", 1)
+            if a.isdigit() and b.isdigit():
+                i, n = int(a), int(b)
+        version = r.get("version", 1)
+        key = (version, r.get("mode"), r.get("circle"), r.get("to"), r.get("from"), r.get("mid"), n)
+        g = groups.setdefault(key, {"n": n, "version": version, "by_index": {}, "all": []})
+        g["by_index"].setdefault(i, r)
+        g["all"].append(r)
+    out = []
+    for g in groups.values():
+        n, by_index = g["n"], g["by_index"]
+        missing = [i for i in range(1, n + 1) if i not in by_index]
+        complete = not missing and set(by_index) == set(range(1, n + 1))
+        ordered = [by_index[i] for i in sorted(by_index)]
+        text = None
+        if complete:
+            if g["version"] == 2:
+                text = stitch_parts([(r["plaintext"], r["codebook"], r["join"]) for r in ordered])
+            else:
+                text = stitch_parts([(r["plaintext"], bool(r.get("codebook"))) for r in ordered])
+        out.append({"complete": complete, "n": n, "version": g["version"], "parts": ordered,
+                    "all": g["all"], "missing": missing, "text": text})
+    return out
 
 
 def cmd_open(args: argparse.Namespace) -> None:
@@ -1037,60 +1466,26 @@ def cmd_open(args: argparse.Namespace) -> None:
     failed = [r for r in results if not r.get("ok")]
     if not opened and not failed:
         raise SystemExit("Nothing to open.")
-    # Stitch i/n fragments of the same conversation back into one message.
-    from collections import defaultdict
-
-    buckets: dict[tuple, list] = defaultdict(list)
-    for r in opened:
-        i, n = 1, 1
-        part = r.get("part") or "1/1"
-        if "/" in part:
-            a, b = part.split("/", 1)
-            if a.isdigit() and b.isdigit():
-                i, n = int(a), int(b)
-        key = (r.get("mode"), r.get("circle"), r.get("to"), r.get("from"), n)
-        buckets[key].append((i, r))
-    printed = set()
-    for key, items in buckets.items():
-        n = key[-1]
-        have = {i for i, _ in items}
-        if n > 1 and have == set(range(1, n + 1)):
-            items.sort(key=lambda t: t[0])
-            r0 = items[0][1]
-            meta = f"[{r0['mode']}"
-            if r0["mode"] == "circle":
-                meta += f" {r0['circle']}"
-            else:
-                meta += f" {r0.get('from','?')} -> {r0.get('to','?')}"
-            if r0["mode"] == "circle":
-                try:
-                    fp = load_circle(r0["circle"])["fingerprint"]
-                    meta += f" fp={fp} {speak_fingerprint(fp)}"
-                except Exception:
-                    pass
-            meta += f" {n} parts]"
+    messages = assemble_messages(opened)
+    # Complete multi-part messages first, then single lines and stray parts.
+    for m in messages:
+        if m["complete"] and m["n"] > 1:
+            meta = _open_meta(m["parts"][0], f"{m['n']} parts")
             print(meta)
-            joined = stitch_parts([(r["plaintext"], bool(r.get("codebook"))) for _, r in items])
-            print(joined)
-            append_transcript(meta, joined)
-            printed.update(id(r) for _, r in items)
-    for r in opened:
-        if id(r) in printed:
+            print(m["text"])
+            append_transcript(meta, m["text"])
+    for m in messages:
+        if m["complete"] and m["n"] > 1:
             continue
-        meta = f"[{r['mode']}"
-        if r["mode"] == "circle":
-            meta += f" {r['circle']}"
-            try:
-                fp = load_circle(r["circle"])["fingerprint"]
-                meta += f" fp={fp} {speak_fingerprint(fp)}"
-            except Exception:
-                pass
-        else:
-            meta += f" {r.get('from','?')} -> {r.get('to','?')}"
-        meta += f" {r.get('part','1/1')}]"
-        print(meta)
-        print(r["plaintext"])
-        append_transcript(meta, r["plaintext"])
+        if not m["complete"] and m["version"] == 2:
+            have = ",".join(r["part"].split("/")[0] for r in m["parts"])
+            print(f"# incomplete S2 message {m['parts'][0]['mid']}: have part(s) {have} of {m['n']}",
+                  file=sys.stderr)
+        for r in m["all"]:
+            meta = _open_meta(r, r.get("part", "1/1"))
+            print(meta)
+            print(r["plaintext"])
+            append_transcript(meta, r["plaintext"])
     for r in failed:
         print(f"# could not open: {r.get('error')}", file=sys.stderr)
     if failed and not opened:
@@ -1101,12 +1496,17 @@ def cmd_info(_: argparse.Namespace) -> None:
     print(
         textwrap.dedent(
             f"""
-            SIGIL protocol {VERSION} — public algorithm, secret keys.
+            SIGIL {__version__} — seals {DEFAULT_WIRE}, opens S2 and S1. Public algorithm, secret keys.
 
-            Modes
-              S1C  circle     shared passphrase, best for a friend group on one server
-              S1K  signet     static P-256 ECDH, compact directed whisper
-              S1E  ephemeral  one-time P-256 key, forward secrecy, larger header
+            Modes (S2 / S1)
+              S2C S1C  circle     shared passphrase, best for a friend group on one server
+              S2K S1K  signet     static P-256 ECDH, compact directed whisper
+              S2E S1E  ephemeral  one-time P-256 key, forward secrecy, larger header
+
+            S2 adds an authenticated frame header: codebook flag, exact
+            rejoin flag, i/n, 48-bit message id (multi-part only), and an
+            optional sender name sealed inside part 1. `seal --wire S1`
+            (or SIGIL_WIRE=S1) emits S1 for old peers.
 
             Primitives
               Circle key   PBKDF2-HMAC-SHA256, {PBKDF2_ITERS} iterations
@@ -1114,14 +1514,17 @@ def cmd_info(_: argparse.Namespace) -> None:
               Seal         AES-256-GCM, 96-bit random nonce, AAD binds context
               Encoding     unpadded URL-safe base64 (A-Za-z0-9-_)
 
-            Minecraft chat budget (256 characters, one line)
-              S1C  ~{capacity('C')} bytes of plaintext
-              S1K  ~{capacity('K')} bytes of plaintext
-              S1E  ~{capacity('E')} bytes of plaintext
-            Longer messages automatically split as i/n fragments.
+            Minecraft chat budget (256 characters), raw UTF-8 bytes per line
+                   one line   each part of a longer message
+              S2C  {s2_capacity('C'):>5}      {s2_capacity('C', multi=True)}
+              S2K  {s2_capacity('K'):>5}      {s2_capacity('K', multi=True)}
+              S2E  {s2_capacity('E'):>5}      {s2_capacity('E', multi=True)}
+              S1 carries a few bytes less per line (python3 tools/capacity.py).
+            Longer messages split into i/n fragments (S2: at most {S2_MAX_PARTS}).
+            A whisper spends part of the 256 on "/msg <name> ": pass --max-line.
 
             What observers see
-              A short token like S1C.deep.v3k1...  They learn that a SIGIL
+              A short token like S2C.deep.AIyA...  They learn that a SIGIL
               message exists, which circle slug it belongs to, and nothing
               about the plaintext. They cannot forge a valid token without
               the key (GCM tag).
@@ -1219,6 +1622,19 @@ def cmd_selftest() -> None:
             assert len(spoken.split()) == 2
             phrase = dice_phrase(5)
             assert len(phrase.split()) == 5
+            # S2: circle raw + compact multi-part with a mid-word cut, sender, K, E.
+            s2 = seal_circle_s2(load_circle("deepcave"), "portal at 1847 12 -320", sender="Steve")
+            s2got = open_line(s2[0])
+            assert s2got["plaintext"] == "portal at 1847 12 -320" and s2got["sender"] == "Steve", s2got
+            long_msg = "/".join(["stash", "portal", "diamond", "nether", "roof"] * 30)
+            zl = seal_circle_s2(load_circle("deepcave"), long_msg, compact=True)
+            zr = [open_line(x) for x in zl]
+            assert len(zl) > 1 and all(r["codebook"] for r in zr), zr
+            assert stitch_parts([(r["plaintext"], r["codebook"], r["join"]) for r in zr]) == long_msg
+            k2 = open_line(seal_to_signet_s2(steve, find_contact("Alex"), "don't sell the elytra")[0])
+            assert k2["plaintext"] == "don't sell the elytra" and k2["version"] == 2, k2
+            e2 = open_line(seal_to_signet_s2(steve, find_contact("Alex"), "one time", ephemeral=True)[0])
+            assert e2["plaintext"] == "one time", e2
             token = wrap_backup("backup pass 99")
             assert token.startswith("S1B.")
             restored = unwrap_backup(token, "backup pass 99")
@@ -1227,6 +1643,7 @@ def cmd_selftest() -> None:
         print("  circle  S1C")
         print("  signet  S1K")
         print("  eph     S1E")
+        print("  S2      S2C (raw, compact i/n, sender) / S2K / S2E")
         print("  chatter embedding")
         print("  codebook compact")
         print("  speak / dice / backup")

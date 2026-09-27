@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 html = ROOT.joinpath("sigil.html").read_text(encoding="utf-8")
 chunks = []
-for name in ("lexicon_v2.js", "codebook_v2.js", "p256.js"):
+for name in ("lexicon_v2.js", "codebook_v2.js", "p256.js", "sigil_s2.js"):
     chunks.append("<script>\n" + ROOT.joinpath(name).read_text(encoding="utf-8") + "\n</script>\n")
     html = html.replace(f'<script src="{name}"></script>\n', "")
 needle = "<script>\nconst PROTOCOL"

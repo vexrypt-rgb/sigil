@@ -66,8 +66,8 @@ Best default for a friend group on one server.
 ```
 you (voice):  "circle deepcave, passphrase: molten copper 4"
 you (chat):   S1+CIRCLE.deep.deepcave.fpk9wq
-you (chat):   S1C.deep.A7x91m...
-them:         sigil open S1C.deep.A7x91m...
+you (chat):   S2C.deep.AIyA7x...
+them:         sigil open S2C.deep.AIyA7x...
 ```
 
 Same circle name + same passphrase on two devices produces the same key.
@@ -82,13 +82,146 @@ you:   sigil signet new Steve
 you:   S1+PK.Steve.r2ab.A6bC...     (paste once, anywhere)
 them:  sigil contact add Steve S1+PK.Steve.r2ab.A6bC...
 them:  sigil seal --to Steve "don't sell the elytra"
-       S1K.r2ab.k9wq.Qlm0...
+       S2K.r2ab.k9wq.AEbq...
 ```
 
-`S1K` uses both static keys (compact). `S1E` uses a fresh ephemeral
+`S2K` uses both static keys (compact). `S2E` uses a fresh ephemeral
 sender key (forward secrecy, fatter header, less room for plaintext).
 
-## Wire format
+## Wire format S2 (default since 0.4.0)
+
+S2 keeps the S1 primitives and keys (same circle key, same signets, same
+keyrings) and changes only the framing. It adds four things:
+
+- **Exact rejoin.** Each fragment says, authenticated, whether one space
+  was consumed at its end. Compact multi-part messages rejoin exactly,
+  including fragments cut mid-word. No heuristic.
+- **Message id.** Every fragment of a multi-part message carries a random
+  48-bit id, bound into the AAD with `i/n`. Parts of different messages
+  cannot be spliced together.
+- **Authenticated sender.** An optional sender name is sealed *inside* part 1,
+  instead of a loose ` #name` suffix.
+- **Strict flags.** Codebook use, `i/n`, message id and sender presence all
+  sit in one header byte (plus part byte and id) that is part of the AAD.
+  There is no lenient fallback like S1's `.z` retry.
+
+### Token grammar
+
+```
+token      = "S2" mode "." route "." blob
+mode       = "C" | "K" | "E"
+route      = slug                              ; mode C: 4 chars [a-z0-9]
+           | to_short "." from_short           ; mode K: 4 chars each
+           | to_short                          ; mode E
+blob       = base64url, no padding, of frame   ; alphabet A-Z a-z 0-9 - _
+frame      = header [eph] nonce ciphertext tag
+header     = flags [part mid]                  ; part and mid present iff flags.M
+flags      = 1 byte
+               0x01 Z  body is a codebook v2 stream (else UTF-8)
+               0x02 J  rejoin: exactly one U+0020 follows this part's text
+               0x04 M  multi-part: part + mid follow
+               0x08 S  plaintext starts with a sender field
+               0xF0    reserved, MUST be 0 (reject otherwise)
+part       = 1 byte: (i - 1) << 4 | (n - 1)    ; 2 <= n <= 16, 1 <= i <= n
+mid        = 6 random bytes, identical in every part of one message
+eph        = 33-byte compressed P-256 point     ; mode E only, fresh per part
+nonce      = 12 random bytes
+ciphertext, tag = AES-256-GCM(key, nonce, plaintext, aad), 16-byte tag
+plaintext  = [slen sender] body                ; sender iff flags.S
+slen       = 1 byte, 1..32 ; sender = slen bytes of UTF-8
+body       = codebook v2 stream starting 0xC2 (iff Z) | UTF-8 text
+```
+
+Single-line messages have `M = 0` and no part byte and no id. The header is
+then just the flags byte. There is nothing to splice, and `M` is in the AAD,
+so a single-line frame and a fragment can never be swapped for each other.
+
+Decoders MUST reject: reserved bits set; `M` with `n < 2` or `i > n`; `J` on
+the last part (`i = n`, including single-line); `S` on a part other than 1;
+a `Z` body that does not start with `0xC2`; a sender field with `slen` outside
+1..32 or longer than the plaintext; invalid UTF-8.
+
+### Keys, context and AAD
+
+```
+C:  key = PBKDF2-HMAC-SHA256(passphrase,
+                             SHA-256("SIGIL.v1.circle.salt." || name)[0:16],
+                             210000, 32)                     ; same key as S1
+    ctx = "SIGIL.v2.C." || circle_name
+K:  ctx = "SIGIL.v2.K." || from_short || "." || to_short
+    key = HKDF-SHA256(ikm = ECDH(from_sk, to_pk), salt = none (32 zero bytes),
+                      info = ctx || from_pk33 || to_pk33, L = 32)
+E:  ctx = "SIGIL.v2.E." || to_short
+    key = HKDF-SHA256(ikm = ECDH(eph_sk, to_pk), salt = none,
+                      info = ctx || eph_pk33 || to_pk33, L = 32)
+
+aad = header || UTF-8(ctx)                  ; header = the exact header bytes sent
+```
+
+`*_pk33` are compressed SEC1 points. The S2K key covers a whole direction and
+does not change per part; each part still gets its own random nonce. An S1 AAD
+starts with `S` (0x53). An S2 AAD starts with a flags byte of at most 0x0F. So
+an S1 blob never verifies as S2, even under the same circle key.
+
+### Rejoining
+
+Open every line, drop duplicates, and group by (mode, route, `mid`, `n`). A
+group is complete when it holds every `i` in 1..n. Then:
+
+```
+message = text_1 + (" " if J_1) + text_2 + (" " if J_2) + ... + text_n
+```
+
+where `text_i` is the body after the sender field, codebook-expanded if `Z`.
+Only part 1 may carry the sender.
+
+### What the sender field proves
+
+In **S2C** the sender name proves only that *someone holding the circle
+passphrase* wrote it. Any circle member can claim any name, and so can a
+former member who kept the passphrase. It stops outsiders and chat relays
+from editing or forging the name. It does not tell circle members apart.
+**S2K (and S1K) is the only mode with real per-sender authentication**:
+the key is bound to the sender's static signet. In **S2E** the name is an
+unverified claim, because anyone with the recipient's public key can seal
+one.
+
+### Sender-side rules (not wire format, but what `sigil.py` and `sigil.html` do)
+
+- Fit each line exactly into `--max-line` (default 256). A frame of L bytes
+  takes `ceil(4L/3)` characters.
+- Compact mode cuts a fragment at a space where it can, consumes that
+  space and sets `J`. Otherwise it cuts mid-word with `J = 0`.
+- A part uses the codebook only if it shrinks *and* expands back to the
+  same text up to letter case. Parts the codebook would reshape (double
+  spaces, tokens over 16 bytes, `a,b`) go out raw. So S2 compact is exact
+  except that dictionary words can come back lowercase.
+- More than 16 parts is an error. Shorten the message, raise
+  `--max-line`, or use `--wire S1`.
+
+### Capacity (raw UTF-8 bytes per line, measured with `python3 tools/capacity.py`)
+
+| | chat, 256 chars: one line | each part | whisper `/msg <16-char name> ` (234): one line | each part |
+|---|---|---|---|---|
+| S2C | 156 | 149 | 139 | 132 |
+| S1C | 152 | 144 | 135 | 127 |
+| S2K | 152 | 145 | 136 | 129 |
+| S1K | 149 | 141 | 132 | 124 |
+| S2E | 123 | 116 | 106 | 99 |
+| S1E | 111 | 103 | 95 | 87 |
+
+S2 carries more per line than S1 despite the new header. S1's chunker left
+slack, and S2 computes its budget exactly and drops the visible `.z` and
+`.i/n` fields. The 6-byte message id costs 8 characters, and only on
+multi-part lines.
+
+### Choosing the wire format
+
+`sigil seal` emits S2. For peers on SIGIL 0.3 or older use
+`sigil seal --wire S1 ...` or `export SIGIL_WIRE=S1`. `sigil open` and the
+browser tool accept both. In the browser, pick "S1" under *Wire format*.
+
+## Wire format S1 (still opened; `--wire S1` to emit)
 
 ```
 S1C.<slug>.<payload>
@@ -117,28 +250,20 @@ different circle name and cannot be presented as part `2/3`.
 
 ## Capacity in one Minecraft line (256 chars)
 
-Approximate UTF-8 byte budgets:
-
-| Mode | Header cost | Plaintext that fits |
-|---|---|---|
-| S1C  | ~12 chars | about 160 bytes |
-| S1K  | ~16 chars | about 155 bytes |
-| S1E  | ~10 chars + 33-byte eph key | about 110 bytes |
-
-English sits near 1 byte/char. A coordinate drop, a stash warning, a
+See the S2 capacity table above (S1 figures included). English sits near 1 byte/char. A coordinate drop, a stash warning, a
 short plan — one line. A paragraph — two or three fragments.
 
 ## Codebook compression (`--compact`)
 
 Ciphertext cannot be dictionary-compressed: it already looks like
 random bytes. Compression runs on **plaintext**, then AES-GCM seals
-the packed bytes. Tokens that used the codebook carry a public `.z.`
-flag so the opener knows to expand.
+the packed bytes. S1 tokens that used the codebook carry a public `.z.`
+flag; S2 sets the `Z` bit in the authenticated header.
 
 ```
 python3 sigil.py compact "nether roof stash at 0 128 0"
 python3 sigil.py seal -c deepcave "nether roof stash at 0 128 0"
-# S1C.deep.z....   (codebook is on by default; --raw skips it)
+# S2C.deep....     (codebook is on by default; --raw skips it)
 ```
 
 v2 uses a 4096-entry frequency-ranked lexicon (`lexicon_v2.txt`):
@@ -176,7 +301,7 @@ Alice→Bob and Bob→Alice are different keys.
 
 **Seal**
 
-AES-256-GCM, 96-bit random nonce, 128-bit tag, AAD as above.
+AES-256-GCM, 96-bit random nonce, 128-bit tag, AAD as above (S2: header || context).
 Nonce reuse under one key is astronomically unlikely (2^-96 per message)
 and would be a local RNG failure, not a protocol one.
 
@@ -186,6 +311,9 @@ and would be a local RNG failure, not a protocol one.
 - The mode (`C` / `K` / `E`).
 - The circle slug or the recipient short-id.
 - The approximate size of the plaintext.
+- For S2 (from the unencrypted but authenticated header): whether the codebook
+  was used, `i/n`, and which lines belong to the same message (the message id).
+  The S2 sender name is inside the ciphertext and not visible.
 
 They do not learn the plaintext. They cannot produce a different
 plaintext that still verifies. They cannot take an `S1C.deep.*` token
@@ -205,7 +333,10 @@ chat filters is a different project.
 - Quantum adversaries (P-256 and AES-256-GCM-with-Grover are the usual
   caveats).
 - Traffic analysis, player-name correlation, "why are those two
-  always pasting S1C tokens after dark."
+  always pasting S2C tokens after dark."
+- Replay. A captured token (or a whole multi-part message) can be pasted
+  again later and still opens. Neither S1 nor S2 keeps state to catch this.
+- Impersonation inside a circle: see "What the sender field proves".
 - Weak passphrases. `password1` is not a circle key. Use a diceware
   phrase.
 
@@ -217,7 +348,9 @@ chat filters is a different project.
 python3 sigil.py info
 python3 sigil.py circle new deepcave
 python3 sigil.py seal -c deepcave "portal at 1847 12 -320"
-python3 sigil.py open S1C.deep....
+python3 sigil.py open S2C.deep....
+python3 sigil.py seal -c deepcave --sender Steve "portal at 1847 12 -320"
+python3 sigil.py seal -c deepcave --wire S1 "for a peer on 0.3"
 
 python3 sigil.py signet new Steve
 python3 sigil.py publish
@@ -248,11 +381,15 @@ case and interoperate with the CLI.
 
 ## Test vectors
 
-`tests/vectors/s1c.json` holds recorded S1C vectors for other implementations:
-positive (plain, unicode, `.z`, `i/n`, boundary lengths) and negative (tampering,
-wrong key, relabelled fragments). They are verified by
-`python3 -m unittest discover -s tests`. The passphrases in that file are
-**public test-only values, not keys**. See `tests/README.md`.
+`tests/vectors/s1c.json` and `tests/vectors/s2c.json` hold recorded circle
+vectors for other implementations: positive (plain, unicode, codebook, `i/n`,
+boundary lengths, S2 sender and mid-word rejoin), negative (tampering, wrong key,
+relabelled fragments, S2 header flips, message-id splice), and for S2
+message-level cases (splice, interleave, duplicate, missing part). They are
+verified by `python3 -m unittest discover -s tests`, and the S2 file is also
+opened by the browser code via Node (`node tests/js/sigil_node.cjs vectors
+tests/vectors/s2c.json`). The passphrases in these files are **public
+test-only values, not keys**. See `tests/README.md`.
 
 ## License of the idea
 
