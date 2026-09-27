@@ -406,6 +406,11 @@ def _open_payload(raw: bytes, compact: bool) -> str:
     return raw.decode("utf-8")
 
 
+def _is_codebook_payload(raw: bytes, compact: bool) -> bool:
+    """True when _open_payload(raw, compact) ran the (lossy) codebook expander."""
+    return compact and raw[:1] in (codebook.MAGIC, codebook.MAGIC2)
+
+
 def seal_circle(
     circle: dict,
     plaintext: str,
@@ -444,7 +449,8 @@ def seal_circle(
 
 def _try_open_circle_blob(
     circle: dict, blob: str, index: int, total: int, compact: bool
-) -> Optional[str]:
+) -> Optional[tuple[str, bool]]:
+    """Return (plaintext, codebook_decoded) or None if it does not open."""
     key = derive_circle_key(circle["name"], circle["passphrase"])
     data = b64d(blob)
     if len(data) < NONCE_LEN + TAG_LEN:
@@ -454,7 +460,7 @@ def _try_open_circle_blob(
     aad = f"{PROTOCOL}.C.{circle['name']}{z}.{index}/{total}".encode("utf-8")
     try:
         pt = AESGCM(key).decrypt(nonce, ct, aad)
-        return _open_payload(pt, compact)
+        return _open_payload(pt, compact), _is_codebook_payload(pt, compact)
     except Exception:
         return None
 
@@ -550,10 +556,11 @@ def open_line(line: str) -> dict:
         for circle in list_circles():
             if circle["slug"] != slug and circle["name"].lower() != slug:
                 continue
-            pt = _try_open_circle_blob(circle, blob, frag_i, frag_n, compact)
-            if pt is None and compact:
-                pt = _try_open_circle_blob(circle, blob, frag_i, frag_n, False)
-            if pt is not None:
+            got = _try_open_circle_blob(circle, blob, frag_i, frag_n, compact)
+            if got is None and compact:
+                got = _try_open_circle_blob(circle, blob, frag_i, frag_n, False)
+            if got is not None:
+                pt, used_codebook = got
                 return {
                     "ok": True,
                     "mode": "circle",
@@ -561,6 +568,7 @@ def open_line(line: str) -> dict:
                     "slug": circle["slug"],
                     "part": f"{frag_i}/{frag_n}",
                     "compact": compact,
+                    "codebook": used_codebook,
                     "plaintext": pt,
                 }
         raise ValueError(f"Could not open circle message for slug '{slug}'. Wrong circle or passphrase.")
@@ -594,14 +602,15 @@ def open_line(line: str) -> dict:
         key = ecdh_key(my_sk, their_pk, info + their_pk_b + my_pk_b)
         data = b64d(blob)
         nonce, ct = data[:NONCE_LEN], data[NONCE_LEN:]
-        pt = _open_payload(AESGCM(key).decrypt(nonce, ct, info), compact)
+        body = AESGCM(key).decrypt(nonce, ct, info)
         return {
             "ok": True,
             "mode": "signet",
             "to": local["name"],
             "from": contact.get("name_hint", from_short),
             "part": f"{frag_i}/{frag_n}",
-            "plaintext": pt,
+            "codebook": _is_codebook_payload(body, compact),
+            "plaintext": _open_payload(body, compact),
         }
 
     if kind == "E":
@@ -626,17 +635,55 @@ def open_line(line: str) -> dict:
         z = ".z" if compact else ""
         info = f"{PROTOCOL}.E.{to_short}{z}.{frag_i}/{frag_n}".encode("utf-8")
         key = ecdh_key(my_sk, eph_pk, info)
-        pt = _open_payload(AESGCM(key).decrypt(nonce, ct, info), compact)
+        body = AESGCM(key).decrypt(nonce, ct, info)
         return {
             "ok": True,
             "mode": "ephemeral",
             "to": local["name"],
             "from": "ephemeral-sender",
             "part": f"{frag_i}/{frag_n}",
-            "plaintext": pt,
+            "codebook": _is_codebook_payload(body, compact),
+            "plaintext": _open_payload(body, compact),
         }
 
     raise ValueError(f"Unknown SIGIL kind '{kind}'.")
+
+
+def _codebook_boundary_space(left: str, right: str) -> bool:
+    """
+    Whitespace restoration for a part boundary that touches a codebook part.
+
+    Codebook v2 does not store spaces; expand_v2 re-inserts one between two
+    word/number tokens and after .,:;?! -- and the encoder drops a part's
+    trailing (and leading) whitespace. _chunk_compact cuts after a space, so
+    that space vanishes at every boundary. Re-apply the decoder's own
+    implicit-space rule across the boundary. This is still a heuristic: a
+    compact part cut mid-word (no space to snap to) gets a spurious space.
+    Telling the two apart needs a boundary marker the S1 payload does not
+    carry, and adding one would change the wire format.
+    """
+    if not left or not right:
+        return False
+    a, b = left[-1], right[0]
+    return (a.isalnum() and b.isalnum()) or (a in ".,:;?!" and b.isalnum())
+
+
+def stitch_parts(parts: list[tuple[str, bool]]) -> str:
+    """
+    Join decoded fragments, already in i/n order: [(plaintext, codebook), ...].
+
+    Raw parts are exact UTF-8 slices (the plain chunker cuts mid-word), so a
+    raw|raw boundary is concatenated byte-exact. Only a boundary next to a
+    codebook-decoded part gets whitespace restored.
+    """
+    joined = ""
+    prev_codebook = False
+    for k, (text, used_codebook) in enumerate(parts):
+        if k and (prev_codebook or used_codebook) and _codebook_boundary_space(joined, text):
+            joined += " "
+        joined += text
+        prev_codebook = used_codebook
+    return joined
 
 
 def open_messages(text: str) -> list[dict]:
@@ -1023,14 +1070,7 @@ def cmd_open(args: argparse.Namespace) -> None:
                     pass
             meta += f" {n} parts]"
             print(meta)
-            pieces = [r["plaintext"] for _, r in items]
-            joined = pieces[0]
-            for p in pieces[1:]:
-                if joined and p:
-                    a, b = joined[-1], p[0]
-                    if (a.isalnum() and b.isalnum()) or (a in ".,:;?!" and b.isalnum()):
-                        joined += " "
-                joined += p
+            joined = stitch_parts([(r["plaintext"], bool(r.get("codebook"))) for _, r in items])
             print(joined)
             append_transcript(meta, joined)
             printed.update(id(r) for _, r in items)
