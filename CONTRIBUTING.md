@@ -8,6 +8,8 @@ sigil.cmd          Windows launcher
 sigil.html         browser sealer (needs lexicon_v2.js + codebook_v2.js)
 sigil.bundle.html  same tool as one file — ship this
 codebook.py        codebook v1 decode + v2 encode/decode
+tools/make_vectors.py  records cross-language test vectors
+tests/             vector check (unittest) + tests/vectors/*.json
 lexicon_v2.txt     frozen 4096-entry public word list
 README.md          protocol spec
 MINECRAFT.md       in-game playbook
@@ -34,7 +36,8 @@ might `git add` by habit. `SIGIL_HOME` exists for that.
 
 ## Rules for changes
 
-1. `python3 sigil.py selftest` must stay green.
+1. `python3 sigil.py selftest` and `python3 -m unittest discover -s tests` must stay green.
+   A wire-format change must come with regenerated vectors (`tools/make_vectors.py`).
 2. Circle tokens produced by `sigil.py` must still open in `sigil.html`,
    and the other way around, unless you are intentionally breaking S1.
 3. Do not add a network call. The point of the tool is that it works

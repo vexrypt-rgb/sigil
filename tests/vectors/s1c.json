@@ -1,0 +1,773 @@
+{
+  "format": "sigil-test-vectors",
+  "format_version": 1,
+  "WARNING": "PUBLIC TEST-ONLY KEY MATERIAL. These passphrases are published on purpose for cross-implementation testing. They are NOT keys. Never use them for real messages.",
+  "suite": "S1C circle messages",
+  "protocol": "S1",
+  "aad_prefix": "SIGIL.v1",
+  "generator": "tools/make_vectors.py (records real sigil.seal_circle output; random nonces)",
+  "lexicon_v2_sha256": "46137094c869354a1c280884c80157d093f271e6bcab0a353516d5a524ec2278",
+  "kdf": {
+    "alg": "PBKDF2-HMAC-SHA256",
+    "iterations": 210000,
+    "length": 32,
+    "salt": "SHA-256(UTF-8('SIGIL.v1.circle.salt.' + name))[0:16]"
+  },
+  "seal": {
+    "cipher": "AES-256-GCM",
+    "nonce_len": 12,
+    "tag_len": 16,
+    "aad": "UTF-8('SIGIL.v1.C.' + name + ('.z' if compact else '') + '.' + i + '/' + n)",
+    "blob": "base64url_nopad(nonce || ciphertext || tag)",
+    "token": "S1C.<slug>[.z][.<i>/<n> only if n>1].<blob>"
+  },
+  "fields": {
+    "positive[].keyring": "circle ids the opener holds",
+    "positive[].lines": "exact chat lines (may wrap the token in other text)",
+    "positive[].parts[].plaintext": "what sigil.open_line returns for that part (codebook-expanded for .z)",
+    "positive[].parts[].payload_hex": "exact bytes that went into AES-GCM",
+    "negative[]": "every line must FAIL to open with the given keyring"
+  },
+  "circles": [
+    {
+      "id": "main",
+      "name": "sigil-vector-test",
+      "passphrase": "sigil-public-test-vector-passphrase-DO-NOT-USE",
+      "slug": "sigi",
+      "fingerprint": "a31n",
+      "kdf": "PBKDF2-HMAC-SHA256/210000",
+      "salt_hex": "a5919131f7ffc2712ebb23c6fa43728a",
+      "key_hex": "7de70578a714bcb128dff637282b3be3a995bd9da6d475eec3ab22949f817e33"
+    },
+    {
+      "id": "wrongpass",
+      "name": "sigil-vector-test",
+      "passphrase": "sigil-public-test-vector-WRONG-passphrase-DO-NOT-USE",
+      "slug": "sigi",
+      "fingerprint": "_sgb",
+      "kdf": "PBKDF2-HMAC-SHA256/210000",
+      "salt_hex": "a5919131f7ffc2712ebb23c6fa43728a",
+      "key_hex": "401dd225e9fffd5fec4456732deb093a93a756c184fb6e7fc329c40fac87b158"
+    },
+    {
+      "id": "sameslug",
+      "name": "sigil-vector-other",
+      "passphrase": "sigil-public-test-vector-passphrase-DO-NOT-USE",
+      "slug": "sigi",
+      "fingerprint": "uoos",
+      "kdf": "PBKDF2-HMAC-SHA256/210000",
+      "salt_hex": "81bac989a7f4be878bef5e1e94b86155",
+      "key_hex": "1dc9c96500081db3c7990ebf07a3bdc02d8a367560a86250bd0400272323b55b"
+    },
+    {
+      "id": "mixedcase",
+      "name": "Sigil-Vector-MixedCase",
+      "passphrase": "sigil-public-test-vector-passphrase-DO-NOT-USE",
+      "slug": "sigi",
+      "fingerprint": "fgvg",
+      "kdf": "PBKDF2-HMAC-SHA256/210000",
+      "salt_hex": "2f41745570f635310388b630c3b0e104",
+      "key_hex": "0247de9accc965f582a2bdb345cfcd629da448064aeb1652aa17f4d8f08400d9"
+    }
+  ],
+  "positive": [
+    {
+      "id": "plain-short",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256
+      },
+      "plaintext": "portal at 1847 12 -320",
+      "plaintext_utf8_hex": "706f7274616c2061742031383437203132202d333230",
+      "lines": [
+        "S1C.sigi.ETFv3eEsdibwfMh1V6Xh_4RuS2I0HwzsmRQ9pxrLpUhhRhOyas9TwpYF-1xD0lHqmS4"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.ETFv3eEsdibwfMh1V6Xh_4RuS2I0HwzsmRQ9pxrLpUhhRhOyas9TwpYF-1xD0lHqmS4",
+          "index": 1,
+          "total": 1,
+          "compact": false,
+          "nonce_hex": "11316fdde12c7626f07cc875",
+          "aad": "SIGIL.v1.C.sigil-vector-test.1/1",
+          "payload_hex": "706f7274616c2061742031383437203132202d333230",
+          "plaintext": "portal at 1847 12 -320"
+        }
+      ],
+      "joined_parts": "portal at 1847 12 -320",
+      "note": "Raw UTF-8, one line."
+    },
+    {
+      "id": "plain-empty",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256
+      },
+      "plaintext": "",
+      "plaintext_utf8_hex": "",
+      "lines": [
+        "S1C.sigi.l6kF0N8k1buUNn6DQItUe_XloiaqrZv_Ap_jPA"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.l6kF0N8k1buUNn6DQItUe_XloiaqrZv_Ap_jPA",
+          "index": 1,
+          "total": 1,
+          "compact": false,
+          "nonce_hex": "97a905d0df24d5bb94367e83",
+          "aad": "SIGIL.v1.C.sigil-vector-test.1/1",
+          "payload_hex": "",
+          "plaintext": ""
+        }
+      ],
+      "joined_parts": "",
+      "note": "Empty plaintext still seals to a valid 28-byte blob."
+    },
+    {
+      "id": "plain-single-line-max",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256
+      },
+      "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "plaintext_utf8_hex": "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+      "lines": [
+        "S1C.sigi.SKd_S22zElUNIbFbmvY0pBydAi6J5sj_1_asAFPuRH7lckfUJPDVsySjp3AuI59njwaPzjyAxp8xIwZ6hukPtT8B2_csHnsdJqE78Cp7Azkqa3_ALDLU5BZxsBY8Ut4nSti4cMyqMy8sLNZ7WFvgNhljmsckbVOJWvT6XmS6ZT9w_A5ANdhWorOQlpzQSk2ms3GWhM55TESl1bpPKnVEWWdoZ9r0qvgs1zQCUUt716xIIS36"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.SKd_S22zElUNIbFbmvY0pBydAi6J5sj_1_asAFPuRH7lckfUJPDVsySjp3AuI59njwaPzjyAxp8xIwZ6hukPtT8B2_csHnsdJqE78Cp7Azkqa3_ALDLU5BZxsBY8Ut4nSti4cMyqMy8sLNZ7WFvgNhljmsckbVOJWvT6XmS6ZT9w_A5ANdhWorOQlpzQSk2ms3GWhM55TESl1bpPKnVEWWdoZ9r0qvgs1zQCUUt716xIIS36",
+          "index": 1,
+          "total": 1,
+          "compact": false,
+          "nonce_hex": "48a77f4b6db312550d21b15b",
+          "aad": "SIGIL.v1.C.sigil-vector-test.1/1",
+          "payload_hex": "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+          "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "joined_parts": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "note": "Longest ASCII run (152 B) that sigil keeps in one line at max_line=256."
+    },
+    {
+      "id": "plain-first-split",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256
+      },
+      "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "plaintext_utf8_hex": "616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+      "lines": [
+        "S1C.sigi.1/2.tol4DJ7LV7sxWn1qXv5VR_ML9BIq3t0-GUS3CqgN-poDzVoG7D8V7eWOnevPoqJwY984hJgzSBg5ylYXuNj5S63ncFAoMOOkvWIjiXo0fOZbVkCkgq2FKNmwh1zh0CzTrk1PfjvRSzWoWyJ6k7z3IlZWDhqzx52kst_Cdcy6CNWJMexOve1dCOIWcBLwrZdFCOA_DpNwAU5m9F1UYTPyuOEbK7VNDvQYurXu9Q",
+        "S1C.sigi.2/2.jzx1-8Tvv2VMIU7hjsYJzAnTGH1ZTvcnE69FYw2X5csDNfwOrg"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.1/2.tol4DJ7LV7sxWn1qXv5VR_ML9BIq3t0-GUS3CqgN-poDzVoG7D8V7eWOnevPoqJwY984hJgzSBg5ylYXuNj5S63ncFAoMOOkvWIjiXo0fOZbVkCkgq2FKNmwh1zh0CzTrk1PfjvRSzWoWyJ6k7z3IlZWDhqzx52kst_Cdcy6CNWJMexOve1dCOIWcBLwrZdFCOA_DpNwAU5m9F1UYTPyuOEbK7VNDvQYurXu9Q",
+          "index": 1,
+          "total": 2,
+          "compact": false,
+          "nonce_hex": "b689780c9ecb57bb315a7d6a",
+          "aad": "SIGIL.v1.C.sigil-vector-test.1/2",
+          "payload_hex": "616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+          "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "token": "S1C.sigi.2/2.jzx1-8Tvv2VMIU7hjsYJzAnTGH1ZTvcnE69FYw2X5csDNfwOrg",
+          "index": 2,
+          "total": 2,
+          "compact": false,
+          "nonce_hex": "8f3c75fbc4efbf654c214ee1",
+          "aad": "SIGIL.v1.C.sigil-vector-test.2/2",
+          "payload_hex": "616161616161616161",
+          "plaintext": "aaaaaaaaa"
+        }
+      ],
+      "joined_parts": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "note": "One byte more than plain-single-line-max: sigil's chunker splits into i/n parts."
+    },
+    {
+      "id": "plain-max-line-180",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 180
+      },
+      "plaintext": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "plaintext_utf8_hex": "6262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262",
+      "lines": [
+        "S1C.sigi.e2rFRcmIvxgQuef_zYrqpW0lSTmlcAxTgN0-vxogx_5cDhm7DLEU_JcZ8w0N81sXLROWGJNXyoBYX4b-1K0ptWYmFuVQkWDmCCDz6VWvpqzjQDRM3-b6z-cOWWALuCA-t74OHm0xBumgalg9Lz2HmgUHrt2KLezLLmVU"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.e2rFRcmIvxgQuef_zYrqpW0lSTmlcAxTgN0-vxogx_5cDhm7DLEU_JcZ8w0N81sXLROWGJNXyoBYX4b-1K0ptWYmFuVQkWDmCCDz6VWvpqzjQDRM3-b6z-cOWWALuCA-t74OHm0xBumgalg9Lz2HmgUHrt2KLezLLmVU",
+          "index": 1,
+          "total": 1,
+          "compact": false,
+          "nonce_hex": "7b6ac545c988bf1810b9e7ff",
+          "aad": "SIGIL.v1.C.sigil-vector-test.1/1",
+          "payload_hex": "6262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262",
+          "plaintext": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "joined_parts": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "note": "Longest single line at max_line=180 (95 B)."
+    },
+    {
+      "id": "plain-multipart-3",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256
+      },
+      "plaintext": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij",
+      "plaintext_utf8_hex": "6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a",
+      "lines": [
+        "S1C.sigi.1/3.VVi60AaOR1ZIyWxRbiqpffjNVC4te8IX-K9NMDBkRY62jUsfRK-IEk7qzvgMua1IfQAhrk1QPcY972WD8knZupZqqWe-jf9eJ6bemJs7Qhhq_uUTSMcuYAuuQTiTuHVF_YWiOX2BkLS9FiUWIS3NPtsurRpkRMNld_VFuvcaWxzcYTaF6RXfRVpFQC73fGjvDjbtwN7P50Dm6P0_DXeUMKs9ZL4uGEm7V8bM4g",
+        "S1C.sigi.2/3.TUqKP49EG1aYTOg5nIae63C4wzZ3RzCS0bDYEfROAk_DxGoIYgCgb1HzUECibrmN66ngXy8QeVuknA2tmMqM24LFPC65L-gAAdxkmrvaNB0aNchDBWhiTTeF-BT8G4_UNHY4mXF_i5WHl-TBChxN0aBNA9-gzNVItbJEYBHPPVWEVgFoXjcn7AYusXMJrkIfJjheHjQOXRSOwGfET6PMA_hphhwGk5rTlhIYAw",
+        "S1C.sigi.3/3.dcFeyxYlstXPRva2ZG7mdW5ya-X2fK94jkogkw93U8MrwZPrMrlrWQ"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.1/3.VVi60AaOR1ZIyWxRbiqpffjNVC4te8IX-K9NMDBkRY62jUsfRK-IEk7qzvgMua1IfQAhrk1QPcY972WD8knZupZqqWe-jf9eJ6bemJs7Qhhq_uUTSMcuYAuuQTiTuHVF_YWiOX2BkLS9FiUWIS3NPtsurRpkRMNld_VFuvcaWxzcYTaF6RXfRVpFQC73fGjvDjbtwN7P50Dm6P0_DXeUMKs9ZL4uGEm7V8bM4g",
+          "index": 1,
+          "total": 3,
+          "compact": false,
+          "nonce_hex": "5558bad0068e475648c96c51",
+          "aad": "SIGIL.v1.C.sigil-vector-test.1/3",
+          "payload_hex": "6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a61626364",
+          "plaintext": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcd"
+        },
+        {
+          "token": "S1C.sigi.2/3.TUqKP49EG1aYTOg5nIae63C4wzZ3RzCS0bDYEfROAk_DxGoIYgCgb1HzUECibrmN66ngXy8QeVuknA2tmMqM24LFPC65L-gAAdxkmrvaNB0aNchDBWhiTTeF-BT8G4_UNHY4mXF_i5WHl-TBChxN0aBNA9-gzNVItbJEYBHPPVWEVgFoXjcn7AYusXMJrkIfJjheHjQOXRSOwGfET6PMA_hphhwGk5rTlhIYAw",
+          "index": 2,
+          "total": 3,
+          "compact": false,
+          "nonce_hex": "4d4a8a3f8f441b56984ce839",
+          "aad": "SIGIL.v1.C.sigil-vector-test.2/3",
+          "payload_hex": "65666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768",
+          "plaintext": "efghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefgh"
+        },
+        {
+          "token": "S1C.sigi.3/3.dcFeyxYlstXPRva2ZG7mdW5ya-X2fK94jkogkw93U8MrwZPrMrlrWQ",
+          "index": 3,
+          "total": 3,
+          "compact": false,
+          "nonce_hex": "75c15ecb1625b2d5cf46f6b6",
+          "aad": "SIGIL.v1.C.sigil-vector-test.3/3",
+          "payload_hex": "696a6162636465666768696a",
+          "plaintext": "ijabcdefghij"
+        }
+      ],
+      "joined_parts": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij",
+      "note": "Three i/n parts. Parts split mid-word; concatenating part plaintexts restores the original exactly (see note on CLI stitching in README)."
+    },
+    {
+      "id": "unicode-mixed",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256
+      },
+      "plaintext": "Grüße 🧭 北 -320 / ñ / שלום / é",
+      "plaintext_utf8_hex": "4772c3bcc39f6520f09fa7ad20e58c97202d333230202f20c3b1202f20d7a9d79cd795d79d202f2065cc81",
+      "lines": [
+        "S1C.sigi.s2Nt1i4JhLlPZjA4xsPJwjIb6M5E7EsFrQxjQB3LSkvLmebRDjwTCfTdsMuAB4_DF6qXTjUljg8Wz3fDvBqNgsmfhj3qOmU"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.s2Nt1i4JhLlPZjA4xsPJwjIb6M5E7EsFrQxjQB3LSkvLmebRDjwTCfTdsMuAB4_DF6qXTjUljg8Wz3fDvBqNgsmfhj3qOmU",
+          "index": 1,
+          "total": 1,
+          "compact": false,
+          "nonce_hex": "b3636dd62e0984b94f663038",
+          "aad": "SIGIL.v1.C.sigil-vector-test.1/1",
+          "payload_hex": "4772c3bcc39f6520f09fa7ad20e58c97202d333230202f20c3b1202f20d7a9d79cd795d79d202f2065cc81",
+          "plaintext": "Grüße 🧭 北 -320 / ñ / שלום / é"
+        }
+      ],
+      "joined_parts": "Grüße 🧭 北 -320 / ñ / שלום / é",
+      "note": "Multi-byte UTF-8, emoji (4-byte), RTL, combining mark."
+    },
+    {
+      "id": "unicode-multipart-emoji",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256
+      },
+      "plaintext": "🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱",
+      "plaintext_utf8_hex": "f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1",
+      "lines": [
+        "S1C.sigi.1/2.8nc7wA8k1ea5WqukwYR3VbcETVLMhjMEp9PBaNGEOOESd1yNCqW22tuN64TiIgfxbcYHYuhiqRVlQkOr0agCC-gi9v69tGqBvd8ePrrASFbjxgBmRsQkqdQjs4RcLLCvn6cNz81FQEDgycDeejUzknV60JlOvopwLnoqpRNub5NifAlVR0VAT84ttFZsi1UyYXWUyw9aSuA7BtAQfvCRKrvjNhQfb_iNR6lfhQ",
+        "S1C.sigi.2/2.PcZcfySk2qAw9DplmHil_AI4Yd2TwCdfmiBpbqGZe4QkoPiCYobtwWc3vN7UmiQ9fGdzG0WQZcR-i5ATVhuiZTanMCa5zMIp6-BTVncxXJSTvGyuIVQIhnBe7WKCCYWrXMY3WHenJ45C_YRK8ZSqoW0RkqoDHGiZ1CQ68w"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.1/2.8nc7wA8k1ea5WqukwYR3VbcETVLMhjMEp9PBaNGEOOESd1yNCqW22tuN64TiIgfxbcYHYuhiqRVlQkOr0agCC-gi9v69tGqBvd8ePrrASFbjxgBmRsQkqdQjs4RcLLCvn6cNz81FQEDgycDeejUzknV60JlOvopwLnoqpRNub5NifAlVR0VAT84ttFZsi1UyYXWUyw9aSuA7BtAQfvCRKrvjNhQfb_iNR6lfhQ",
+          "index": 1,
+          "total": 2,
+          "compact": false,
+          "nonce_hex": "f2773bc00f24d5e6b95aaba4",
+          "aad": "SIGIL.v1.C.sigil-vector-test.1/2",
+          "payload_hex": "f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1",
+          "plaintext": "🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱"
+        },
+        {
+          "token": "S1C.sigi.2/2.PcZcfySk2qAw9DplmHil_AI4Yd2TwCdfmiBpbqGZe4QkoPiCYobtwWc3vN7UmiQ9fGdzG0WQZcR-i5ATVhuiZTanMCa5zMIp6-BTVncxXJSTvGyuIVQIhnBe7WKCCYWrXMY3WHenJ45C_YRK8ZSqoW0RkqoDHGiZ1CQ68w",
+          "index": 2,
+          "total": 2,
+          "compact": false,
+          "nonce_hex": "3dc65c7f24a4daa030f43a65",
+          "aad": "SIGIL.v1.C.sigil-vector-test.2/2",
+          "payload_hex": "f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1f09fa7b1",
+          "plaintext": "🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱"
+        }
+      ],
+      "joined_parts": "🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱",
+      "note": "4-byte code points; the chunker must never split inside a code point."
+    },
+    {
+      "id": "newline",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256
+      },
+      "plaintext": "line one\nline two",
+      "plaintext_utf8_hex": "6c696e65206f6e650a6c696e652074776f",
+      "lines": [
+        "S1C.sigi.x8dxSD-b7CzJJQRy-m1B-3KvxNNf1vBWLwqwtdlt_a9mX42LnHP0zI2aFmur"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.x8dxSD-b7CzJJQRy-m1B-3KvxNNf1vBWLwqwtdlt_a9mX42LnHP0zI2aFmur",
+          "index": 1,
+          "total": 1,
+          "compact": false,
+          "nonce_hex": "c7c771483f9bec2cc9250472",
+          "aad": "SIGIL.v1.C.sigil-vector-test.1/1",
+          "payload_hex": "6c696e65206f6e650a6c696e652074776f",
+          "plaintext": "line one\nline two"
+        }
+      ],
+      "joined_parts": "line one\nline two",
+      "note": "Newlines survive inside the ciphertext."
+    },
+    {
+      "id": "compact-z",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": true,
+        "max_line": 256
+      },
+      "plaintext": "nether roof stash at 0 128 0",
+      "plaintext_utf8_hex": "6e657468657220726f6f662073746173682061742030203132382030",
+      "lines": [
+        "S1C.sigi.z.wsdhYz1rxNDEzBVHwFcbeuyfo_q40yC-5zGJCVKumU8dtJPmkA"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.z.wsdhYz1rxNDEzBVHwFcbeuyfo_q40yC-5zGJCVKumU8dtJPmkA",
+          "index": 1,
+          "total": 1,
+          "compact": true,
+          "nonce_hex": "c2c761633d6bc4d0c4cc1547",
+          "aad": "SIGIL.v1.C.sigil-vector-test.z.1/1",
+          "payload_hex": "c200100604440181c0",
+          "plaintext": "nether roof stash at 0 128 0"
+        }
+      ],
+      "joined_parts": "nether roof stash at 0 128 0",
+      "note": "Codebook v2 (.z). payload_hex is the packed codebook stream (starts 0xC2)."
+    },
+    {
+      "id": "compact-no-gain",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": true,
+        "max_line": 256
+      },
+      "plaintext": "Zq9xKv7Wm3",
+      "plaintext_utf8_hex": "5a7139784b7637576d33",
+      "lines": [
+        "S1C.sigi.uRtqYGZN_UbCz8gobARt72InplP_hUSF1hNUrVHpyaJWkfgV3vc"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.uRtqYGZN_UbCz8gobARt72InplP_hUSF1hNUrVHpyaJWkfgV3vc",
+          "index": 1,
+          "total": 1,
+          "compact": false,
+          "nonce_hex": "b91b6a60664dfd46c2cfc828",
+          "aad": "SIGIL.v1.C.sigil-vector-test.1/1",
+          "payload_hex": "5a7139784b7637576d33",
+          "plaintext": "Zq9xKv7Wm3"
+        }
+      ],
+      "joined_parts": "Zq9xKv7Wm3",
+      "note": "compact requested but the codebook does not shrink it: no .z flag, raw UTF-8 payload."
+    },
+    {
+      "id": "compact-multipart",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": true,
+        "max_line": 256
+      },
+      "plaintext": "nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon",
+      "plaintext_utf8_hex": "6e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e206e657468657220726f6f662073746173682061742030203132382030206272696e6720746865206469616d6f6e64207069636b61786520616e642074686520657965206f6620656e646572206d65657420617420746865207275696e656420706f7274616c20616674657220647261676f6e",
+      "lines": [
+        "S1C.sigi.z.1/3.GSE3WUkfm6sYLxSZMeG4IlE0YO8VfUt0OVXIdTH-pQRo_WSV38bv-KR1SPsp8QvW8swFgLjoWRzb4aHL04Ik_QaypllZZUgM34GuVQJZtRU7eCI8dHm4ES4zidVcwAnDCLvmnhmvhqkWbOjP0sHv71ZxqEwsHjErq-CErg6fSwRJ1T5_NsHw74bXsjkT6q_2f41aSkHSd8SQI3zOJM6hSznKUJ3OM85sa1BV2MwPrk1dng",
+        "S1C.sigi.z.2/3.9gm8T-kxHr637Z1bmlvD8uep8but8vMPdyXPlCBWFpT69ebmVY_MFFFqGM_dKgUOQdKaqds4XZGaXyljGBHZR-oTXsaFgy3pKdVaJwNUX9qOTWfZ50VCrZl_OMSwggA4FQjATDlt1mEp5nfh3sD9nAzpIeGHnaROiwYwFyhFoss5vQ2H1IrKAutnNhxgHoMxr-stNJOaDasX44UR8gxRqQUqUvRT7UOKBec0e6jcwOrZ",
+        "S1C.sigi.z.3/3.KZpNX5gkkEXTivlzoOVzz2ksdROBLp_WEBNkPEfwBC1Aj9Nc5yQdYHEvhF4BeZLvv8QnGFrN2g"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.z.1/3.GSE3WUkfm6sYLxSZMeG4IlE0YO8VfUt0OVXIdTH-pQRo_WSV38bv-KR1SPsp8QvW8swFgLjoWRzb4aHL04Ik_QaypllZZUgM34GuVQJZtRU7eCI8dHm4ES4zidVcwAnDCLvmnhmvhqkWbOjP0sHv71ZxqEwsHjErq-CErg6fSwRJ1T5_NsHw74bXsjkT6q_2f41aSkHSd8SQI3zOJM6hSznKUJ3OM85sa1BV2MwPrk1dng",
+          "index": 1,
+          "total": 3,
+          "compact": true,
+          "nonce_hex": "19213759491f9bab182f1499",
+          "aad": "SIGIL.v1.C.sigil-vector-test.z.1/3",
+          "payload_hex": "c2001006044401809c49404a2c45052a024083d50120120800200c0888030138928094588a0a54048107aa024024100040181110060271250128b11414a809020f540480482000803022200c04e24a02516228295012041ea80900904001006044401809c49404a2c45052a024083d50120120800200c0888030138928094588a0a54048107aa02402410004018111006027125013c0",
+          "plaintext": "nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the"
+        },
+        {
+          "token": "S1C.sigi.z.2/3.9gm8T-kxHr637Z1bmlvD8uep8but8vMPdyXPlCBWFpT69ebmVY_MFFFqGM_dKgUOQdKaqds4XZGaXyljGBHZR-oTXsaFgy3pKdVaJwNUX9qOTWfZ50VCrZl_OMSwggA4FQjATDlt1mEp5nfh3sD9nAzpIeGHnaROiwYwFyhFoss5vQ2H1IrKAutnNhxgHoMxr-stNJOaDasX44UR8gxRqQUqUvRT7UOKBec0e6jcwOrZ",
+          "index": 2,
+          "total": 3,
+          "compact": true,
+          "nonce_hex": "f609bc4fe9311ebeb7ed9d5b",
+          "aad": "SIGIL.v1.C.sigil-vector-test.z.2/3",
+          "payload_hex": "c24588a0a54048107aa024024100040181110060271250128b11414a809020f540480482000803022200c04e24a02516228295012041ea80900904001006044401809c49404a2c45052a024083d50120120800200c0888030138928094588a0a54048107aa024024100040181110060271250128b11414a809020f540480482000803022200c04e24a02516228295012041ea809e0",
+          "plaintext": "diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the"
+        },
+        {
+          "token": "S1C.sigi.z.3/3.KZpNX5gkkEXTivlzoOVzz2ksdROBLp_WEBNkPEfwBC1Aj9Nc5yQdYHEvhF4BeZLvv8QnGFrN2g",
+          "index": 3,
+          "total": 3,
+          "compact": true,
+          "nonce_hex": "299a4d5f98249045d38af973",
+          "aad": "SIGIL.v1.C.sigil-vector-test.z.3/3",
+          "payload_hex": "c200904001006044401809c49404a2c45052a024083d501201209c",
+          "plaintext": "ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon"
+        }
+      ],
+      "joined_parts": "nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring thediamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at theruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon",
+      "note": "Codebook v2 with i/n parts. Each part is packed and sealed separately."
+    },
+    {
+      "id": "compact-lossy",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": true,
+        "max_line": 256
+      },
+      "plaintext": "Nether Roof stash at 0 128 0 ",
+      "plaintext_utf8_hex": "4e657468657220526f6f66207374617368206174203020313238203020",
+      "lines": [
+        "S1C.sigi.z.5rR-wSId0-pRS-6bMJA3z-skMVgNUrc4OYGJvWtKCX_LfF6OIg"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.z.5rR-wSId0-pRS-6bMJA3z-skMVgNUrc4OYGJvWtKCX_LfF6OIg",
+          "index": 1,
+          "total": 1,
+          "compact": true,
+          "nonce_hex": "e6b47ec1221dd3ea514bee9b",
+          "aad": "SIGIL.v1.C.sigil-vector-test.z.1/1",
+          "payload_hex": "c200100604440181c0",
+          "plaintext": "nether roof stash at 0 128 0"
+        }
+      ],
+      "joined_parts": "nether roof stash at 0 128 0",
+      "note": "Codebook v2 is lossy by design: dictionary words come back lowercase and trailing whitespace is dropped. parts[].plaintext / joined_parts hold what sigil returns."
+    },
+    {
+      "id": "mixed-case-name",
+      "circle": "mixedcase",
+      "keyring": [
+        "mixedcase"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256
+      },
+      "plaintext": "case matters in the AAD",
+      "plaintext_utf8_hex": "63617365206d61747465727320696e2074686520414144",
+      "lines": [
+        "S1C.sigi.L0u8YdpL9SfAp85bALcaU7Sg2kczpVewJX_2ds99papGNZNV7-DR_zVK6wNjX6qV00gZ"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.L0u8YdpL9SfAp85bALcaU7Sg2kczpVewJX_2ds99papGNZNV7-DR_zVK6wNjX6qV00gZ",
+          "index": 1,
+          "total": 1,
+          "compact": false,
+          "nonce_hex": "2f4bbc61da4bf527c0a7ce5b",
+          "aad": "SIGIL.v1.C.Sigil-Vector-MixedCase.1/1",
+          "payload_hex": "63617365206d61747465727320696e2074686520414144",
+          "plaintext": "case matters in the AAD"
+        }
+      ],
+      "joined_parts": "case matters in the AAD",
+      "note": "Circle name is case-preserving in salt and AAD."
+    },
+    {
+      "id": "slug-collision",
+      "circle": "main",
+      "keyring": [
+        "sameslug",
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256
+      },
+      "plaintext": "tag picks the winner",
+      "plaintext_utf8_hex": "746167207069636b73207468652077696e6e6572",
+      "lines": [
+        "S1C.sigi.uEM60lo-Yo85rpafFGpIAHwyH9ywCt7maR4UFbExjLkHdDPTrW8NnzhX5n_yh38i"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.uEM60lo-Yo85rpafFGpIAHwyH9ywCt7maR4UFbExjLkHdDPTrW8NnzhX5n_yh38i",
+          "index": 1,
+          "total": 1,
+          "compact": false,
+          "nonce_hex": "b8433ad25a3e628f39ae969f",
+          "aad": "SIGIL.v1.C.sigil-vector-test.1/1",
+          "payload_hex": "746167207069636b73207468652077696e6e6572",
+          "plaintext": "tag picks the winner"
+        }
+      ],
+      "joined_parts": "tag picks the winner",
+      "note": "Two circles share slug 'sigi'; the opener tries both and the GCM tag decides."
+    },
+    {
+      "id": "buried-in-text",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256
+      },
+      "plaintext": "coords later",
+      "plaintext_utf8_hex": "636f6f726473206c61746572",
+      "lines": [
+        "check this tome S1C.sigi.4PtQIIDJ_ZlzToywFKsnH-Kj2u6Pm35UpJAInhvbe8EumoDoL9nnww please"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.4PtQIIDJ_ZlzToywFKsnH-Kj2u6Pm35UpJAInhvbe8EumoDoL9nnww",
+          "index": 1,
+          "total": 1,
+          "compact": false,
+          "nonce_hex": "e0fb502080c9fd99734e8cb0",
+          "aad": "SIGIL.v1.C.sigil-vector-test.1/1",
+          "payload_hex": "636f6f726473206c61746572",
+          "plaintext": "coords later"
+        }
+      ],
+      "joined_parts": "coords later",
+      "note": "The parser accepts a token buried in other text."
+    },
+    {
+      "id": "sender-suffix",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256
+      },
+      "plaintext": "anon or not",
+      "plaintext_utf8_hex": "616e6f6e206f72206e6f74",
+      "lines": [
+        "S1C.sigi.xoo3beq2-V1vpAcAjewcKlqXkaP19D8DS9-lRTTGZuSBFRoNGkIC #Steve"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.xoo3beq2-V1vpAcAjewcKlqXkaP19D8DS9-lRTTGZuSBFRoNGkIC",
+          "index": 1,
+          "total": 1,
+          "compact": false,
+          "nonce_hex": "c68a376deab6f95d6fa40700",
+          "aad": "SIGIL.v1.C.sigil-vector-test.1/1",
+          "payload_hex": "616e6f6e206f72206e6f74",
+          "plaintext": "anon or not"
+        }
+      ],
+      "joined_parts": "anon or not",
+      "note": "sigil appends ' #sender' outside the token when a sender is given; it is NOT authenticated."
+    },
+    {
+      "id": "lenient-z-flag-added",
+      "circle": "main",
+      "keyring": [
+        "main"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256
+      },
+      "plaintext": "lenient z retry",
+      "plaintext_utf8_hex": "6c656e69656e74207a207265747279",
+      "lines": [
+        "S1C.sigi.z.wLvih8cLje2mCtH72xczDo_uS2_f-aLYcWh7ZYHMj1_vNO7ItJYHgqbDZw"
+      ],
+      "parts": [
+        {
+          "token": "S1C.sigi.z.wLvih8cLje2mCtH72xczDo_uS2_f-aLYcWh7ZYHMj1_vNO7ItJYHgqbDZw",
+          "index": 1,
+          "total": 1,
+          "compact": false,
+          "nonce_hex": "c0bbe287c70b8deda60ad1fb",
+          "aad": "SIGIL.v1.C.sigil-vector-test.1/1",
+          "payload_hex": "6c656e69656e74207a207265747279",
+          "plaintext": "lenient z retry",
+          "opened_compact_flag": true
+        }
+      ],
+      "joined_parts": "lenient z retry",
+      "note": "'.z' inserted into a raw token after sealing. sigil still opens it because open_line falls back to the non-compact AAD. Header fields other than .z are authenticated."
+    }
+  ],
+  "negative": [
+    {
+      "id": "tampered-tag",
+      "line": "S1C.sigi.PLnIFM2BxFyZSnSucNygGNXLcvtaikF-ZzNUm9j6kKN1_tt9Og",
+      "reason": "Last byte of the GCM tag flipped.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "tampered-ciphertext",
+      "line": "S1C.sigi.PLnIFM2BxFyZSnSucdygGNXLcvtaikF-ZzNUm9j6kKN1_tt9Ow",
+      "reason": "First ciphertext byte flipped.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "tampered-nonce",
+      "line": "S1C.sigi.PbnIFM2BxFyZSnSucNygGNXLcvtaikF-ZzNUm9j6kKN1_tt9Ow",
+      "reason": "First nonce byte flipped.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "wrong-passphrase",
+      "line": "S1C.sigi.I3pqf7aiEyn-j5edi4nw4o4d-0sA59cpCE7KdsuX2M1C_Fye15RaqL70NkPCgnjI9TDW3g",
+      "reason": "Same circle name, different passphrase (key mismatch).",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "wrong-name-same-slug",
+      "line": "S1C.sigi.uixlSa4EuVe7g4kCEvxO6EiB81JHJXhOLw1KFjD0jTPxCGm8IQIbF3-jWDDhSc5y",
+      "reason": "Sealed under 'sigil-vector-other' (same slug, same passphrase); opener only holds 'sigil-vector-test'. Name is bound into salt and AAD.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "fragment-index-swapped",
+      "line": "S1C.sigi.2/3.PDIDfHieSQaSWIPEHfV6SRQYBH-zVPaV8gQdxPHwRD4CRepwJMrIcxZwmCa7iZ1wbCyuTw0mVbbSTOiP4d4-QHbLuRVYndoIZuN04TQlb0GUxqSf3FdOyheZQGWACF7QBa2b1u4GNWVPX_khQVsLW2tEprhozdnN9wHa8p9T0bruG0GkzosdEZvNp1YReWVgtyTUD7-7wuz9O7oNfWGpnY_p-jE0AP-TSPn6_Q",
+      "reason": "Part 1/3 relabelled 2/3: i/n is in the AAD.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "fragment-total-changed",
+      "line": "S1C.sigi.1/2.PDIDfHieSQaSWIPEHfV6SRQYBH-zVPaV8gQdxPHwRD4CRepwJMrIcxZwmCa7iZ1wbCyuTw0mVbbSTOiP4d4-QHbLuRVYndoIZuN04TQlb0GUxqSf3FdOyheZQGWACF7QBa2b1u4GNWVPX_khQVsLW2tEprhozdnN9wHa8p9T0bruG0GkzosdEZvNp1YReWVgtyTUD7-7wuz9O7oNfWGpnY_p-jE0AP-TSPn6_Q",
+      "reason": "Part 1/3 relabelled 1/2: i/n is in the AAD.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "z-flag-removed",
+      "line": "S1C.sigi.M-VuDjyXXTOT7-Z87qlLsmw8m3bGGAlh6tgF4fOCvIvhxCWywg",
+      "reason": "'.z' removed from a compact token: '.z' is in the AAD and there is no fallback this way.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "slug-unknown",
+      "line": "S1C.qqqq.PLnIFM2BxFyZSnSucNygGNXLcvtaikF-ZzNUm9j6kKN1_tt9Ow",
+      "reason": "Slug matches no circle on the keyring.",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "truncated-blob",
+      "line": "S1C.sigi.eHh4eHh4eHh4eHh4eHh4eHh4eHg",
+      "reason": "Blob shorter than nonce + tag (28 bytes).",
+      "keyring": [
+        "main"
+      ]
+    },
+    {
+      "id": "not-sigil",
+      "line": "hello world, nothing sealed here",
+      "reason": "No S1 token present.",
+      "keyring": [
+        "main"
+      ]
+    }
+  ]
+}
