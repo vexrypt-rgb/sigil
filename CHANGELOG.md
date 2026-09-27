@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Cross-language S1C test vectors: `tests/vectors/s1c.json` (public test-only
+  passphrases), generator `tools/make_vectors.py`, check `tests/test_vectors.py`.
+  No wire-format or crypto change.
+
 ## 0.3.0
 
 - Spoken fingerprint on circle create / open (`# say: hopper gunpowder`).
