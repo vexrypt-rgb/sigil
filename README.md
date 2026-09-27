@@ -246,6 +246,14 @@ case and interoperate with the CLI.
   trying every local circle with that slug; the GCM tag picks the winner.
 - UTF-8 plaintext. Newlines survive if you seal from stdin.
 
+## Test vectors
+
+`tests/vectors/s1c.json` holds recorded S1C vectors for other implementations:
+positive (plain, unicode, `.z`, `i/n`, boundary lengths) and negative (tampering,
+wrong key, relabelled fragments). They are verified by
+`python3 -m unittest discover -s tests`. The passphrases in that file are
+**public test-only values, not keys**. See `tests/README.md`.
+
 ## License of the idea
 
 Use it. Fork it. The construction is deliberately boring on purpose:

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Cross-language S1C test vectors: `tests/vectors/s1c.json` (public test-only
+  passphrases), generator `tools/make_vectors.py`, check `tests/test_vectors.py`.
+  No wire-format or crypto change.
 - `sigil open`: raw (non-`.z`) fragments are stitched byte-exact. The space-restoring
   heuristic now applies only at boundaries next to a codebook-decoded part.
   No wire-format change.
