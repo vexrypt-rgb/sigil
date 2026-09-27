@@ -34,18 +34,27 @@ reports. SIGIL is what you paste *inside* those channels.
 python3 sigil.py seal -c deepcave "portal 1847 12 -320. after dragon."
 ```
 
-Compression is on by default, so the line is a `.z.` token, usually
-well under 256 characters. Use `--raw` only if the other person cannot
-expand codebook v2.
+The line is an `S2C` token. Compression is on by default, so it is
+usually well under 256 characters. Use `--raw` only if the other person
+cannot expand codebook v2. If a friend is still on SIGIL 0.3 or older,
+add `--wire S1` (their copy cannot open S2).
+
+Add `--sender Steve` to seal your name into the message. In a circle
+that only proves the sender holds the passphrase. Any member can type
+any name.
 
 Paste it in public chat, or:
 
 ```
-/msg Alex S1C.deep.XHbl-s6htesjjC3ejOD_NvQ4...
+/msg Alex S2C.deep.BAKzQ6R1MWxn1eU0Qyxr...
 ```
 
-If the tool prints two lines (`1/2` and `2/2`), paste them as two chat
-messages, in order.
+The whisper prefix counts against the 256 characters. For `/msg` to a
+16-character name pass `--max-line 234`.
+
+If the tool prints several lines, paste each as its own chat message.
+With S2 the order does not matter: the opener puts the parts back
+together by their message id.
 
 ## Opening
 
@@ -69,8 +78,8 @@ python3 sigil.py contact add Alex S1+PK.Alex....
 python3 sigil.py seal --to Alex "don't sell the elytra"
 ```
 
-`S1K` is the compact form. Add `--ephemeral` if you want the sender key
-to die with that message (`S1E`, ~40 fewer bytes of room).
+`S2K` is the compact form. Add `--ephemeral` if you want the sender key
+to die with that message (`S2E`, ~30 fewer bytes of room).
 
 ## Etiquette that actually matters
 

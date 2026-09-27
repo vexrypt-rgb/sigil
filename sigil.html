@@ -147,18 +147,31 @@
         <input id="seal-target" placeholder="circle name or contact alias">
       </div>
     </div>
+    <div class="row">
+      <div>
+        <label>Wire format</label>
+        <select id="seal-wire">
+          <option value="S2">S2 (default)</option>
+          <option value="S1">S1 (for peers on SIGIL 0.3 or older)</option>
+        </select>
+      </div>
+      <div>
+        <label>Sender name (optional, S2 only)</label>
+        <input id="seal-sender" placeholder="sealed inside the message">
+      </div>
+    </div>
     <label>Plaintext</label>
     <textarea id="seal-text" placeholder="meet at the ruined portal after nightfall"></textarea>
     <label><input type="checkbox" id="seal-compact" checked> Compact (Minecraft + ops codebook v2)</label>
     <button class="go" id="seal-btn">Seal into chat line</button>
     <button class="go ghost" id="copy-seal">Copy</button>
     <div class="out" id="seal-out"></div>
-    <p class="hint">Minecraft public chat and whispers cap a line at 256 characters. Long messages split into <kbd>i/n</kbd> fragments. Paste each fragment as its own chat line.</p>
+    <p class="hint">Minecraft public chat and whispers cap a line at 256 characters. Long messages split into fragments. Paste each fragment as its own chat line. In a circle the S2 sender name is sealed, but any circle member can claim any name; only signet mode proves who sent it.</p>
   </section>
 
   <section class="panel" id="open">
     <label>Ciphertext from chat</label>
-    <textarea id="open-text" placeholder="S1C.deep.v3k1..."></textarea>
+    <textarea id="open-text" placeholder="S2C.deep.AIyA... or S1C.deep.v3k1..."></textarea>
     <button class="go" id="open-btn">Open</button>
     <div class="out" id="open-out"></div>
   </section>
@@ -206,10 +219,12 @@
     <p class="hint">
       SIGIL is a public algorithm. Security lives in the keys, not in hiding how it works.
       <br><br>
-      <kbd>S1C.slug.payload</kbd> — AES-256-GCM under a PBKDF2-SHA256 circle key (210000 iterations).<br>
-      <kbd>S1K.to.from.payload</kbd> — P-256 ECDH + HKDF-SHA256 + AES-256-GCM.<br>
-      <kbd>S1E.to.payload</kbd> — ephemeral P-256 sender key, then the same seal.<br>
-      Payload is <kbd>nonce || ciphertext || tag</kbd> in unpadded URL-safe base64.
+      <kbd>S2C.slug.blob</kbd> — AES-256-GCM under a PBKDF2-SHA256 circle key (210000 iterations).<br>
+      <kbd>S2K.to.from.blob</kbd> — P-256 ECDH + HKDF-SHA256 + AES-256-GCM.<br>
+      <kbd>S2E.to.blob</kbd> — ephemeral P-256 sender key, then the same seal.<br>
+      Blob is <kbd>header || [eph key] || nonce || ciphertext || tag</kbd> in unpadded URL-safe base64.
+      The header (flags, part i/n, 48-bit message id) is authenticated, so parts cannot be relabelled or
+      spliced across messages, and fragments rejoin exactly. S1 tokens still open; pick S1 above for old peers.
       <br><br>
       AAD binds the circle or the direction so a valid token cannot be silently retargeted.
       Observers learn that a sealed message exists and which slug or short-id it is for.
@@ -222,7 +237,7 @@
   </section>
 </main>
 <footer>
-  Protocol S1 · keys live in this browser's localStorage · no network requests after the page loads.
+  Protocol S2 (opens S1) · keys live in this browser's localStorage · no network requests after the page loads.
   <span id="lex-hash"></span>
 </footer>
 <script>
@@ -582,13 +597,20 @@ $("seal-btn").onclick = async () => {
   const target = $("seal-target").value.trim();
   const text = $("seal-text").value;
   const out = $("seal-out");
+  const wire = $("seal-wire").value;
+  const sender = $("seal-sender").value.trim();
+  const compact = $("seal-compact").checked;
+  localStorage.setItem("sigil.wire", wire);
   try {
     if (!text) throw new Error("Type a message first.");
+    if (wire === "S2" && !window.SIGIL_S2) throw new Error("sigil_s2.js not loaded");
     if (mode === "C") {
       const db = store();
       const rec = (db.circles || {})[target.toLowerCase()] || Object.values(db.circles || {}).find(c => c.slug === target || c.name.toLowerCase() === target.toLowerCase());
       if (!rec) throw new Error("Unknown circle. Save it in the Circle tab.");
-      const lines = await sealCircle(rec.name, rec.pass, text, $("seal-compact").checked);
+      const lines = wire === "S2"
+        ? await SIGIL_S2.sealCircle(rec.name, rec.pass, text, { compact, sender })
+        : await sealCircle(rec.name, rec.pass, text, compact);
       out.textContent = lines.join("\n");
       return;
     }
@@ -598,7 +620,10 @@ $("seal-btn").onclick = async () => {
       if (!signets.length) throw new Error("Forge a signet first.");
       const contact = (db.contacts || {})[target.toLowerCase()] || Object.values(db.contacts || {}).find(c => c.short === target);
       if (!contact) throw new Error("Unknown contact. Paste their S1+PK in the Signet tab.");
-      const lines = await sealToContact(signets[0], contact, text, mode === "E", $("seal-compact").checked);
+      const lines = wire === "S2"
+        ? await SIGIL_S2.sealDirected({ short: signets[0].short, pk: signets[0].pk, priv: await importLocalPriv(signets[0]) },
+            contact, text, { ephemeral: mode === "E", compact, sender })
+        : await sealToContact(signets[0], contact, text, mode === "E", compact);
       out.textContent = lines.join("\n");
       return;
     }
@@ -618,10 +643,20 @@ $("open-btn").onclick = async () => {
   const raw = $("open-text").value.trim();
   const out = $("open-out");
   const db = store();
-  const lines = raw.split(/\s+/).filter(t => t.startsWith("S1"));
-  if (!lines.length) { out.innerHTML = '<span class="bad">No S1 token found.</span>'; return; }
+  const lines = raw.replace(/,/g, " ").split(/\s+/).filter(t => t.startsWith("S1") || /^S2[CKE]\./.test(t));
+  if (!lines.length) { out.innerHTML = '<span class="bad">No SIGIL token found.</span>'; return; }
   const msgs = [];
+  const s2results = [];
+  let ring = null;
   for (const line of lines) {
+    if (line.startsWith("S2")) {
+      try {
+        if (!window.SIGIL_S2) throw new Error("sigil_s2.js not loaded");
+        ring = ring || await s2Keyring(db);
+        s2results.push(await SIGIL_S2.openToken(line, ring));
+      } catch (e) { msgs.push(`failed ${line.slice(0, 12)}: ${e.message}`); }
+      continue;
+    }
     const parts = line.split(".");
     const kind = parts[0].slice(2);
     if (kind === "K" || kind === "E") {
@@ -655,8 +690,32 @@ $("open-btn").onclick = async () => {
       msgs.push(`failed ${slug}: ${e.message}`);
     }
   }
+  if (s2results.length) for (const m of SIGIL_S2.group(s2results)) msgs.push(formatS2(m));
   out.textContent = msgs.join("\n\n");
 };
+
+async function s2Keyring(db) {
+  const seen = new Set(), contacts = [];
+  for (const c of Object.values(db.contacts || {})) {
+    if (seen.has(c.short)) continue;
+    seen.add(c.short);
+    contacts.push({ alias: c.alias, short: c.short, pk: c.pk });
+  }
+  return {
+    circles: Object.values(db.circles || {}).map(c => ({ name: c.name, pass: c.pass })),
+    signets: await Promise.all(Object.values(db.signets || {}).map(async s => ({ name: s.name, short: s.short, pk: s.pk, priv: await importLocalPriv(s) }))),
+    contacts,
+  };
+}
+
+function formatS2(m) {
+  const head = m.mode === "circle" ? `circle ${m.circle}` : m.mode === "signet" ? `signet ${m.from} -> ${m.to}` : `ephemeral -> ${m.to}`;
+  const note = m.mode === "circle" ? " (circle member claim)" : m.mode === "ephemeral" ? " (unverified claim)" : "";
+  const snd = m.sender ? ` · sender ${m.sender}${note}` : "";
+  if (m.complete) return `[S2 ${head}${snd} · ${m.total === 1 ? "1 line" : m.total + " parts"}]\n${m.text}`;
+  return `[S2 ${head}${snd} · incomplete: missing part(s) ${m.missing.join(", ")} of ${m.total}]\n` +
+    m.parts.map(p => `(${p.part}) ${p.plaintext}`).join("\n");
+}
 
 $("selftest-btn") && ($("selftest-btn").onclick = async () => {
   const out = $("selftest-out");
@@ -669,7 +728,16 @@ $("selftest-btn") && ($("selftest-btn").onclick = async () => {
     const compact = parts.includes("z");
     const pt = await openCircleLine(name, pass, parts[parts.length - 1], 1, 1, compact);
     if (pt.replace(/\s+/g, " ").trim() !== "nether roof stash at 0 128 0") throw new Error("round-trip mismatch: " + pt);
-    out.textContent = "selftest ok\n" + tok;
+    let s2tok = "(sigil_s2.js not loaded)";
+    if (window.SIGIL_S2) {
+      const long = Array(40).fill("stash/portal/diamond/nether/roof").join("/");
+      const s2lines = await SIGIL_S2.sealCircle(name, pass, long, { compact: true, sender: "Steve" });
+      const ring = { circles: [{ name, pass }] };
+      const got = SIGIL_S2.group(await Promise.all(s2lines.map(l => SIGIL_S2.openToken(l, ring))));
+      if (got.length !== 1 || !got[0].complete || got[0].text !== long || got[0].sender !== "Steve") throw new Error("S2 round-trip mismatch");
+      s2tok = `${s2lines.length} S2 parts rejoined exactly\n${s2lines[0]}`;
+    }
+    out.textContent = "selftest ok\n" + tok + "\n" + s2tok;
   } catch (e) {
     out.innerHTML = '<span class="bad">' + e.message + "</span>";
   }
@@ -683,10 +751,12 @@ if (window.SIGIL_LEXICON_V2) {
   });
 }
 
+if (localStorage.getItem("sigil.wire") === "S1") $("seal-wire").value = "S1";
 refreshLists();
 </script>
 <script src="lexicon_v2.js"></script>
 <script src="codebook_v2.js"></script>
 <script src="p256.js"></script>
+<script src="sigil_s2.js"></script>
 </body>
 </html>
