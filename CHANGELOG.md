@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `sigil open`: raw (non-`.z`) fragments are stitched byte-exact. The space-restoring
+  heuristic now applies only at boundaries next to a codebook-decoded part.
+  No wire-format change.
+
 ## 0.3.0
 
 - Spoken fingerprint on circle create / open (`# say: hopper gunpowder`).
