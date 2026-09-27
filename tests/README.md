@@ -41,9 +41,9 @@ Notes for implementers (current S1 behaviour, recorded rather than changed):
   `.z` inserted still opens (`lenient-z-flag-added`). Removing `.z` from a compact token does not.
 - Codebook v2 is lossy: dictionary words come back lowercase and trailing whitespace is dropped.
   Compact multi-part messages therefore lose the space at each part boundary. `sigil open`'s
-  stitcher compensates by inserting a space between alphanumeric boundaries. It does the same
-  for raw parts, which the plain chunker splits mid-word (`plain-multipart-3` prints as
-  `…abcd efgh…`). Concatenating `parts[].plaintext` is exact for raw parts.
+  stitcher (`stitch_parts`) compensates by inserting a space between alphanumeric boundaries,
+  but only next to a codebook-decoded part. Raw parts, which the plain chunker splits mid-word,
+  are joined byte-exact (`plain-multipart-3` round-trips).
 - `i/n` is bound into the AAD, but no message id is. Parts of two different messages with the same
   `n` are not cryptographically tied together.
 - The ` #sender` suffix is outside the token and is not authenticated.
