@@ -43,6 +43,18 @@ def jwk(signet: dict) -> dict:
     }
 
 
+def sign_jwk(signet: dict) -> dict:
+    """Ed25519 private JWK (RFC 8037) for a signet's signing key."""
+    sk = sigil._sign_sk_from_rec(signet)
+    raw = sk.private_bytes(sigil.serialization.Encoding.Raw, sigil.serialization.PrivateFormat.Raw,
+                           sigil.serialization.NoEncryption())
+    return {"kty": "OKP", "crv": "Ed25519", "ext": True, "d": sigil.b64e(raw), "x": signet["sign_pk"]}
+
+
+def js_signet(s: dict) -> dict:
+    return {"name": s["name"], "short": s["short"], "pk": s["pk"], "jwk": jwk(s), "sign_jwk": sign_jwk(s)}
+
+
 MESSAGES = [
     ("portal at 1847 12 -320", {}),
     ("abcdefghij" * 40, {}),
@@ -65,13 +77,16 @@ class JsInterop(unittest.TestCase):
         cls.circle = sigil.load_circle("interop")
         cls.steve = sigil.signet_create("Steve")
         cls.alex = sigil.signet_create("Alex")
-        sigil.remember_contact("Alex", cls.alex["pk"], "Alex")
-        sigil.remember_contact("Steve", cls.steve["pk"], "Steve")
+        sigil.remember_contact("Alex", cls.alex["pk"], "Alex", cls.alex["sign_pk"])
+        sigil.remember_contact("Steve", cls.steve["pk"], "Steve", cls.steve["sign_pk"])
+        # Mallory is in the circle but NOT in anyone's keyring (never saved to HOME).
+        cls.mallory = sigil.signet_record("Mallory", sigil.ec.generate_private_key(sigil.ec.SECP256R1()),
+                                          sigil.ed25519.Ed25519PrivateKey.generate())
         cls.ring = {
             "circles": [{"name": "interop", "pass": PASS}],
-            "signets": [{"name": s["name"], "short": s["short"], "pk": s["pk"], "jwk": jwk(s)}
-                        for s in (cls.steve, cls.alex)],
-            "contacts": [{"alias": s["name"], "short": s["short"], "pk": s["pk"]} for s in (cls.steve, cls.alex)],
+            "signets": [js_signet(s) for s in (cls.steve, cls.alex)],
+            "contacts": [{"alias": s["name"], "short": s["short"], "pk": s["pk"], "spk": s["sign_pk"]}
+                         for s in (cls.steve, cls.alex)],
         }
 
     @classmethod
@@ -88,9 +103,57 @@ class JsInterop(unittest.TestCase):
         self.assertIn("js selftest ok", p.stdout)
 
     def test_js_opens_vectors(self) -> None:
-        p = node("vectors", str(ROOT / "tests" / "vectors" / "s2c.json"))
-        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertIn("0 failed", p.stdout)
+        for name in ("s2c.json", "s2k.json", "s2s.json"):
+            with self.subTest(vectors=name):
+                p = node("vectors", str(ROOT / "tests" / "vectors" / name))
+                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                self.assertIn(" 0 failed", p.stdout)
+
+    def test_s2s_python_signs_js_verifies(self) -> None:
+        for signer in (self.steve, self.alex):
+            for text, kw in MESSAGES:
+                with self.subTest(signer=signer["name"], text=text[:20], **kw):
+                    lines = sigil.seal_circle_signed_s2(self.circle, signer, text, **kw)
+                    p = node("job", job=dict(self.ring, op="open", lines=lines))
+                    self.assertEqual(p.returncode, 0, p.stderr)
+                    res = json.loads(p.stdout)
+                    self.assertEqual(res["errors"], [])
+                    self.assertEqual(len(res["messages"]), 1)
+                    js = res["messages"][0]
+                    self.assertTrue(js["verified"], js.get("error"))
+                    self.assertEqual(js["signer"], signer["name"])
+                    self.assertEqual(js["signerFp"], sigil.fingerprint(sigil.b64d(signer["sign_pk"])))
+                    want = text.lower() if kw.get("compact") else text
+                    self.assertEqual(js["text"], want)
+        # Mallory holds the circle key but her signing key is unknown: JS must not show it.
+        lines = sigil.seal_circle_signed_s2(self.circle, self.mallory, "I am Steve", sender="Steve")
+        res = json.loads(node("job", job=dict(self.ring, op="open", lines=lines)).stdout)
+        self.assertEqual(len(res["messages"]), 1)
+        self.assertFalse(res["messages"][0]["verified"])
+        self.assertIsNone(res["messages"][0]["text"])
+        self.assertIn("unknown signer", res["messages"][0]["error"])
+
+    def test_s2s_js_signs_python_verifies(self) -> None:
+        jobs = [{"mode": "S", "text": text, "from_short": s["short"], "circle": {"name": "interop", "pass": PASS}, **kw}
+                for s in (self.steve, self.alex, self.mallory) for text, kw in MESSAGES]
+        ring = dict(self.ring, signets=self.ring["signets"] + [js_signet(self.mallory)])
+        p = node("job", job=dict(ring, op="seal", messages=jobs))
+        self.assertEqual(p.returncode, 0, p.stderr)
+        sealed = json.loads(p.stdout)["lines"]
+        for m, lines in zip(jobs, sealed, strict=True):
+            with self.subTest(signer=m["from_short"], text=m["text"][:20]):
+                self.assertTrue(all(x.startswith("S2S.") and len(x) <= 256 for x in lines))
+                msgs = sigil.assemble_messages([sigil.open_line(x) for x in lines])
+                self.assertEqual(len(msgs), 1)
+                self.assertTrue(msgs[0]["complete"])
+                if m["from_short"] == self.mallory["short"]:
+                    self.assertFalse(msgs[0]["verified"])
+                    self.assertIsNone(msgs[0]["text"])
+                    continue
+                self.assertTrue(msgs[0]["verified"], msgs[0].get("error"))
+                who = self.steve if m["from_short"] == self.steve["short"] else self.alex
+                self.assertEqual(msgs[0]["signer"], who["name"])
+                self.assertEqual(msgs[0]["text"], m["text"].lower() if m.get("compact") else m["text"])
 
     def test_python_seals_js_opens(self) -> None:
         alex = sigil.find_contact("Alex")

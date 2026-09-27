@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Measure per-line plaintext capacity of S1 vs S2 with the real sealers.
+Measure per-line plaintext capacity of S1 vs S2 (incl. S2S signed) with the real sealers.
 
     python3 tools/capacity.py
 
@@ -44,6 +44,7 @@ def main() -> None:
         ("S2", "C"): lambda t, m: sigil.seal_circle_s2(circle, t, max_line=m),
         ("S2", "K"): lambda t, m: sigil.seal_to_signet_s2(me, contact, t, max_line=m),
         ("S2", "E"): lambda t, m: sigil.seal_to_signet_s2(me, contact, t, ephemeral=True, max_line=m),
+        ("S2", "S"): lambda t, m: sigil.seal_circle_signed_s2(circle, me, t, max_line=m),
     }
 
     def single(fn, m: int) -> int:
@@ -70,6 +71,13 @@ def main() -> None:
             pp, longest = per_part(fn, m)
             flag = "" if longest <= m else "  (exceeds max_line)"
             print(f"{wire:4} {mode:4} {m:8} {s:7} {pp:9} {longest:13}{flag}")
+    print()
+    print("lines needed for N raw bytes (S2C vs S2S signed vs S2K)")
+    print(f"{'max_line':>8} " + " ".join(f"{n:>11}" for n in (40, 67, 84, 120, 200, 300, 600)))
+    for m in (256, 256 - WHISPER):
+        for mode in ("C", "S", "K"):
+            fn = sealers[("S2", mode)]
+            print(f"{m:8} " + " ".join(f"{'S2' + mode + ' ' + str(len(fn('a' * n, m))):>11}" for n in (40, 67, 84, 120, 200, 300, 600)))
     _TMP.cleanup()
 
 

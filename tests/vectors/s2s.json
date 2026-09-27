@@ -1,0 +1,1092 @@
+{
+  "format": "sigil-test-vectors",
+  "format_version": 1,
+  "WARNING": "PUBLIC TEST-ONLY KEY MATERIAL. These signet private keys (P-256 and Ed25519) are derived from public labels ('sigil-public-test-signet-<name>-...-DO-NOT-USE') and published on purpose for cross-implementation testing. They are NOT keys. Never use them for real messages. Circle passphrases likewise.",
+  "suite": "S2S signed circle messages (Ed25519)",
+  "protocol": "S2",
+  "aad_prefix": "SIGIL.v2",
+  "sigil_version": "0.5.0",
+  "generator": "tools/make_vectors.py --suite s2s (records real sigil.seal_circle_signed_s2 output; random nonces/ids; Ed25519 signatures are deterministic)",
+  "lexicon_v2_sha256": "46137094c869354a1c280884c80157d093f271e6bcab0a353516d5a524ec2278",
+  "seal": {
+    "token": "S2S.<slug>.<blob>",
+    "key": "circle key (as S2C)",
+    "ctx": "UTF-8('SIGIL.v2.S.' + name)",
+    "aad": "header || ctx",
+    "plaintext": "as S2C; the LAST part additionally ends with keyid(8) || sig(64)",
+    "keyid": "SHA-256(Ed25519 public key)[0:8]",
+    "signed_bytes": "'SIGIL.v2.sig' 0x00 || u16(len ctx) ctx || keyid || u8(n) || for each part: u8(len header) header || u16(len pt) pt   (pt without the trailer; big-endian)",
+    "sig": "Ed25519 (RFC 8032, pure) over signed_bytes",
+    "sealer_policy": "trailer goes into the last text part when it fits, else into an extra part with an empty raw body"
+  },
+  "fields": {
+    "signets[]": "public test signets (see s2k.json); sign_seed_hex / sign_jwk = Ed25519 private key",
+    "positive[].verifier_keys": "signing public keys the opener holds",
+    "positive[].parts[].payload_hex": "part plaintext without the trailer (what the signature covers)",
+    "positive[].parts[].sealed_plaintext_hex": "exact bytes that went into AES-GCM (with trailer)",
+    "positive[].signed_bytes_hex / sig_hex": "exact Ed25519 input and signature (deterministic)",
+    "messages[]": "open + assemble + verify: expect.verified and expect.error (bad-signature | unknown-signer | incomplete)",
+    "negative[]": "every line must FAIL to open"
+  },
+  "circles": [
+    {
+      "id": "main",
+      "name": "sigil-vector-test",
+      "passphrase": "sigil-public-test-vector-passphrase-DO-NOT-USE",
+      "slug": "sigi",
+      "fingerprint": "a31n",
+      "kdf": "PBKDF2-HMAC-SHA256/210000",
+      "salt_hex": "a5919131f7ffc2712ebb23c6fa43728a",
+      "key_hex": "7de70578a714bcb128dff637282b3be3a995bd9da6d475eec3ab22949f817e33"
+    },
+    {
+      "id": "wrongpass",
+      "name": "sigil-vector-test",
+      "passphrase": "sigil-public-test-vector-WRONG-passphrase-DO-NOT-USE",
+      "slug": "sigi",
+      "fingerprint": "_sgb",
+      "kdf": "PBKDF2-HMAC-SHA256/210000",
+      "salt_hex": "a5919131f7ffc2712ebb23c6fa43728a",
+      "key_hex": "401dd225e9fffd5fec4456732deb093a93a756c184fb6e7fc329c40fac87b158"
+    },
+    {
+      "id": "sameslug",
+      "name": "sigil-vector-other",
+      "passphrase": "sigil-public-test-vector-passphrase-DO-NOT-USE",
+      "slug": "sigi",
+      "fingerprint": "uoos",
+      "kdf": "PBKDF2-HMAC-SHA256/210000",
+      "salt_hex": "81bac989a7f4be878bef5e1e94b86155",
+      "key_hex": "1dc9c96500081db3c7990ebf07a3bdc02d8a367560a86250bd0400272323b55b"
+    },
+    {
+      "id": "mixedcase",
+      "name": "Sigil-Vector-MixedCase",
+      "passphrase": "sigil-public-test-vector-passphrase-DO-NOT-USE",
+      "slug": "sigi",
+      "fingerprint": "fgvg",
+      "kdf": "PBKDF2-HMAC-SHA256/210000",
+      "salt_hex": "2f41745570f635310388b630c3b0e104",
+      "key_hex": "0247de9accc965f582a2bdb345cfcd629da448064aeb1652aa17f4d8f08400d9"
+    }
+  ],
+  "signets": [
+    {
+      "id": "alice",
+      "label": "sigil-public-test-signet-alice-DO-NOT-USE",
+      "record": {
+        "kind": "signet",
+        "name": "Alice",
+        "short": "n9fw",
+        "pk": "AifYxQ6lKEZ_CEtcc_h9tYD5RBTS1xNEOS-DEFAPRU1_",
+        "sk_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQglhPd2n3Vxgro2Kux\nsSliueA7hHJh5nHhOY1AYMKC9UKhRANCAAQn2MUOpShGfwhLXHP4fbWA+UQU0tcT\nRDkvgxBQD0VNf1MXOQ2smjVAJbG2XzqXUvM63gKQQXnZ4Aw40q5aqqgS\n-----END PRIVATE KEY-----\n",
+        "curve": "P-256",
+        "created": "2026-09-27T00:00:00Z",
+        "sign_alg": "Ed25519",
+        "sign_pk": "VWSTYIimkXuPDNc2T7a8uwMdXqkJNjQTHOYB1Q064IQ",
+        "sign_short": "9vgd",
+        "sign_sk_pem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIID1Uy0uF9D+L48AA5dGtpOT5ydm8cpZhrG4yA5J+sDL\n-----END PRIVATE KEY-----\n"
+      },
+      "name": "Alice",
+      "short": "n9fw",
+      "pk": "AifYxQ6lKEZ_CEtcc_h9tYD5RBTS1xNEOS-DEFAPRU1_",
+      "fingerprint": "n9fwDNm0I8g-34RDxSCmCvkNkub0iz3hSoxeezKAQsg",
+      "sk_hex": "9613ddda7dd5c60ae8d8abb1b12962b9e03b847261e671e1398d4060c282f542",
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "J9jFDqUoRn8IS1xz-H21gPlEFNLXE0Q5L4MQUA9FTX8",
+        "y": "Uxc5DayaNUAlsbZfOpdS8zreApBBedngDDjSrlqqqBI",
+        "d": "lhPd2n3Vxgro2KuxsSliueA7hHJh5nHhOY1AYMKC9UI"
+      },
+      "sign_pk": "VWSTYIimkXuPDNc2T7a8uwMdXqkJNjQTHOYB1Q064IQ",
+      "sign_short": "9vgd",
+      "sign_fingerprint": "9vGDG9bXyYns7F9FlHr28q110nxPmSZOrxM2_BuPFUU",
+      "sign_keyid_hex": "f6f1831bd6d7c989",
+      "sign_seed_hex": "80f5532d2e17d0fe2f8f00039746b69393e72766f1ca5986b1b8c80e49fac0cb",
+      "sign_jwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "VWSTYIimkXuPDNc2T7a8uwMdXqkJNjQTHOYB1Q064IQ",
+        "d": "gPVTLS4X0P4vjwADl0a2k5PnJ2bxylmGsbjIDkn6wMs"
+      },
+      "announcement": "S2+PK.Alice.n9fw.AifYxQ6lKEZ_CEtcc_h9tYD5RBTS1xNEOS-DEFAPRU1_.VWSTYIimkXuPDNc2T7a8uwMdXqkJNjQTHOYB1Q064IQ"
+    },
+    {
+      "id": "bob",
+      "label": "sigil-public-test-signet-bob-DO-NOT-USE",
+      "record": {
+        "kind": "signet",
+        "name": "Bob",
+        "short": "ofiz",
+        "pk": "Ai7HfEHjBIVvBv2Hm7U_gDtoGoK7EGm2Oy5Lh_rvWjkp",
+        "sk_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgYskKSs/61rOQArJH\nm0kBClhgy7P1Q0WOwDRM8irlXFChRANCAAQux3xB4wSFbwb9h5u1P4A7aBqCuxBp\ntjsuS4f671o5KRJnjszKA78CMd+cdtjVmsM7R9boeyQiKbDpiYj4FRKQ\n-----END PRIVATE KEY-----\n",
+        "curve": "P-256",
+        "created": "2026-09-27T00:00:00Z",
+        "sign_alg": "Ed25519",
+        "sign_pk": "7RVgvDNjJlsgD1FH6K5ezWORw_W3oo2BuQWtb9jA7ts",
+        "sign_short": "pyq6",
+        "sign_sk_pem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIGBgYTIQpsiGFSw6uE1ui/+INHD67/YvLs7x7s3XKEDR\n-----END PRIVATE KEY-----\n"
+      },
+      "name": "Bob",
+      "short": "ofiz",
+      "pk": "Ai7HfEHjBIVvBv2Hm7U_gDtoGoK7EGm2Oy5Lh_rvWjkp",
+      "fingerprint": "Ofiz13kM-g-tXZbIX5xqdC2GjPWPrUbWFsPvlC28h1U",
+      "sk_hex": "62c90a4acffad6b39002b2479b49010a5860cbb3f543458ec0344cf22ae55c50",
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "Lsd8QeMEhW8G_YebtT-AO2gagrsQabY7LkuH-u9aOSk",
+        "y": "EmeOzMoDvwIx35x22NWawztH1uh7JCIpsOmJiPgVEpA",
+        "d": "YskKSs_61rOQArJHm0kBClhgy7P1Q0WOwDRM8irlXFA"
+      },
+      "sign_pk": "7RVgvDNjJlsgD1FH6K5ezWORw_W3oo2BuQWtb9jA7ts",
+      "sign_short": "pyq6",
+      "sign_fingerprint": "pYq6UA4fHWkKPj_Q9anN0rx4amb8mlEpc9G0fp0Gbvk",
+      "sign_keyid_hex": "a58aba500e1f1d69",
+      "sign_seed_hex": "6060613210a6c886152c3ab84d6e8bff883470faeff62f2ecef1eecdd72840d1",
+      "sign_jwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "7RVgvDNjJlsgD1FH6K5ezWORw_W3oo2BuQWtb9jA7ts",
+        "d": "YGBhMhCmyIYVLDq4TW6L_4g0cPrv9i8uzvHuzdcoQNE"
+      },
+      "announcement": "S2+PK.Bob.ofiz.Ai7HfEHjBIVvBv2Hm7U_gDtoGoK7EGm2Oy5Lh_rvWjkp.7RVgvDNjJlsgD1FH6K5ezWORw_W3oo2BuQWtb9jA7ts"
+    },
+    {
+      "id": "carol",
+      "label": "sigil-public-test-signet-carol-DO-NOT-USE",
+      "record": {
+        "kind": "signet",
+        "name": "Carol",
+        "short": "3vgy",
+        "pk": "AqVSJW3qa86_XHXm6Rs6l080IUzkszU2lzkoapk4qUGN",
+        "sk_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgun53Io+Mujpz+AlK\nlSpDrl8zvEViFy446wfswsok+guhRANCAASlUiVt6mvOv1x15ukbOpdPNCFM5LM1\nNpc5KGqZOKlBjZfGpAgl/CsEYIUqu/7pXLTU2C5h0eONkq9ek6eOkhO0\n-----END PRIVATE KEY-----\n",
+        "curve": "P-256",
+        "created": "2026-09-27T00:00:00Z",
+        "sign_alg": "Ed25519",
+        "sign_pk": "xLM_RQDWsvc53wfklrsgN8UDPnCBzsF97AzKPf20gZ4",
+        "sign_short": "jg3u",
+        "sign_sk_pem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIEbUgEhDe5j40meLFqp2XaCzejEMs37dF4xVFOg7yo2P\n-----END PRIVATE KEY-----\n"
+      },
+      "name": "Carol",
+      "short": "3vgy",
+      "pk": "AqVSJW3qa86_XHXm6Rs6l080IUzkszU2lzkoapk4qUGN",
+      "fingerprint": "3vGYWLnUF6n9y0BJoo9gsMwAATI5i7pZhqFBkL021rc",
+      "sk_hex": "ba7e77228f8cba3a73f8094a952a43ae5f33bc4562172e38eb07ecc2ca24fa0b",
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "pVIlbeprzr9cdebpGzqXTzQhTOSzNTaXOShqmTipQY0",
+        "y": "l8akCCX8KwRghSq7_ulctNTYLmHR442Sr16Tp46SE7Q",
+        "d": "un53Io-Mujpz-AlKlSpDrl8zvEViFy446wfswsok-gs"
+      },
+      "sign_pk": "xLM_RQDWsvc53wfklrsgN8UDPnCBzsF97AzKPf20gZ4",
+      "sign_short": "jg3u",
+      "sign_fingerprint": "jG3uXpqbXw4G6VxMCKeeRzzly6ygk72E0Gpo093FrGw",
+      "sign_keyid_hex": "8c6dee5e9a9b5f0e",
+      "sign_seed_hex": "46d48048437b98f8d2678b16aa765da0b37a310cb37edd178c5514e83bca8d8f",
+      "sign_jwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "xLM_RQDWsvc53wfklrsgN8UDPnCBzsF97AzKPf20gZ4",
+        "d": "RtSASEN7mPjSZ4sWqnZdoLN6MQyzft0XjFUU6DvKjY8"
+      },
+      "announcement": "S2+PK.Carol.3vgy.AqVSJW3qa86_XHXm6Rs6l080IUzkszU2lzkoapk4qUGN.xLM_RQDWsvc53wfklrsgN8UDPnCBzsF97AzKPf20gZ4"
+    },
+    {
+      "id": "mallory",
+      "label": "sigil-public-test-signet-mallory-DO-NOT-USE",
+      "record": {
+        "kind": "signet",
+        "name": "Mallory",
+        "short": "a46q",
+        "pk": "AowHfAWnQQeu8YsXBAtiEZfiaaP2lz4rsecKnKcXYKWU",
+        "sk_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg0cLmw15AOUzNREi7\n2CfmgGr8s6ADLRtqFeTUkMB8F02hRANCAASMB3wFp0EHrvGLFwQLYhGX4mmj9pc+\nK7HnCpynF2CllHBzPK8K9l3O5j602YP8T7KjqCXL6a8fiEPQutCu26AS\n-----END PRIVATE KEY-----\n",
+        "curve": "P-256",
+        "created": "2026-09-27T00:00:00Z",
+        "sign_alg": "Ed25519",
+        "sign_pk": "oa6QWNoNqmcMEyqJkUSRv4oJHCN3nBWxMv-Pip6kE8k",
+        "sign_short": "vccr",
+        "sign_sk_pem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIM81OmrOIj8tH+IWjhoHfL/tjwyv91jyd9x+mlJ5qzac\n-----END PRIVATE KEY-----\n"
+      },
+      "name": "Mallory",
+      "short": "a46q",
+      "pk": "AowHfAWnQQeu8YsXBAtiEZfiaaP2lz4rsecKnKcXYKWU",
+      "fingerprint": "a46QFTuhbZryzkeH2m4e8zgp6MHIePehFOucZwotaKI",
+      "sk_hex": "d1c2e6c35e40394ccd4448bbd827e6806afcb3a0032d1b6a15e4d490c07c174d",
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "jAd8BadBB67xixcEC2IRl-Jpo_aXPiux5wqcpxdgpZQ",
+        "y": "cHM8rwr2Xc7mPrTZg_xPsqOoJcvprx-IQ9C60K7boBI",
+        "d": "0cLmw15AOUzNREi72CfmgGr8s6ADLRtqFeTUkMB8F00"
+      },
+      "sign_pk": "oa6QWNoNqmcMEyqJkUSRv4oJHCN3nBWxMv-Pip6kE8k",
+      "sign_short": "vccr",
+      "sign_fingerprint": "Vccra_ot0cVCRZE6hcwHbF_wtnxig5WbhKLZkgLBHCE",
+      "sign_keyid_hex": "55c72b6bfa2dd1c5",
+      "sign_seed_hex": "cf353a6ace223f2d1fe2168e1a077cbfed8f0caff758f277dc7e9a5279ab369c",
+      "sign_jwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "oa6QWNoNqmcMEyqJkUSRv4oJHCN3nBWxMv-Pip6kE8k",
+        "d": "zzU6as4iPy0f4haOGgd8v-2PDK_3WPJ33H6aUnmrNpw"
+      },
+      "announcement": "S2+PK.Mallory.a46q.AowHfAWnQQeu8YsXBAtiEZfiaaP2lz4rsecKnKcXYKWU.oa6QWNoNqmcMEyqJkUSRv4oJHCN3nBWxMv-Pip6kE8k"
+    }
+  ],
+  "positive": [
+    {
+      "id": "signed-short",
+      "circle": "main",
+      "signer": "alice",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "portal at 1847 12 -320",
+      "lines": [
+        "S2S.sigi.AD_HOSgzjEt2pag-HdZZEEQBWJMSG8fJ-9tVo7sHlsrdo0Yjj2j-EIRe4l5WeG9CViIQONxnXt6bxsX7Seb2Hj6YWGHNWRhQFW1ex5A2jcQJvoTItBUcMq9kb53f6pCI44iuo2MHhfbhdnYJUmhI__-SO90qJJxBpzlz"
+      ],
+      "parts": [
+        {
+          "token": "S2S.sigi.AD_HOSgzjEt2pag-HdZZEEQBWJMSG8fJ-9tVo7sHlsrdo0Yjj2j-EIRe4l5WeG9CViIQONxnXt6bxsX7Seb2Hj6YWGHNWRhQFW1ex5A2jcQJvoTItBUcMq9kb53f6pCI44iuo2MHhfbhdnYJUmhI__-SO90qJJxBpzlz",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "3fc73928338c4b76a5a83e1d",
+          "aad_hex": "00534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "706f7274616c2061742031383437203132202d333230",
+          "sealed_plaintext_hex": "706f7274616c2061742031383437203132202d333230f6f1831bd6d7c989efcdbc33f6bd85096cf1bd434442c95fedb8c9206cf0daa887927a59e8c9ca7a3ab3db823e74ea5c1bd05610308e0d89043586e7a0869a2120519597b3b0430b",
+          "plaintext": "portal at 1847 12 -320"
+        }
+      ],
+      "keyid_hex": "f6f1831bd6d7c989",
+      "sig_hex": "efcdbc33f6bd85096cf1bd434442c95fedb8c9206cf0daa887927a59e8c9ca7a3ab3db823e74ea5c1bd05610308e0d89043586e7a0869a2120519597b3b0430b",
+      "signed_bytes_hex": "534947494c2e76322e73696700001c534947494c2e76322e532e736967696c2d766563746f722d74657374f6f1831bd6d7c9890101000016706f7274616c2061742031383437203132202d333230",
+      "joined": "portal at 1847 12 -320",
+      "expect": {
+        "verified": true,
+        "signer": "Alice"
+      },
+      "note": "One line: [body] || keyid(8) || Ed25519 sig(64) inside the ciphertext."
+    },
+    {
+      "id": "signed-empty",
+      "circle": "main",
+      "signer": "alice",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "",
+      "lines": [
+        "S2S.sigi.APv3jAMP3L-i1AfdHwVzSnjecdTANGMwayd3hFzsnN6xa7eWj3C4nviWlCmGhqOXoqGqz6nQn0b9jRwtrcmxeFtmqfRd_bZXzW6bvdvUSGlzxKhO0IHcjx4q4hUeKOC9F9aLJ38"
+      ],
+      "parts": [
+        {
+          "token": "S2S.sigi.APv3jAMP3L-i1AfdHwVzSnjecdTANGMwayd3hFzsnN6xa7eWj3C4nviWlCmGhqOXoqGqz6nQn0b9jRwtrcmxeFtmqfRd_bZXzW6bvdvUSGlzxKhO0IHcjx4q4hUeKOC9F9aLJ38",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "fbf78c030fdcbfa2d407dd1f",
+          "aad_hex": "00534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "",
+          "sealed_plaintext_hex": "f6f1831bd6d7c989f5831ff3d2c1bec786ca11e2671910e1e4c3f1d63cd5fafbc0d1de3497bcb27acdedc369624916d6db70b94ed2cf48447c9e16f25d0be1c5e009e87a7bd75505",
+          "plaintext": ""
+        }
+      ],
+      "keyid_hex": "f6f1831bd6d7c989",
+      "sig_hex": "f5831ff3d2c1bec786ca11e2671910e1e4c3f1d63cd5fafbc0d1de3497bcb27acdedc369624916d6db70b94ed2cf48447c9e16f25d0be1c5e009e87a7bd75505",
+      "signed_bytes_hex": "534947494c2e76322e73696700001c534947494c2e76322e532e736967696c2d766563746f722d74657374f6f1831bd6d7c9890101000000",
+      "joined": "",
+      "expect": {
+        "verified": true,
+        "signer": "Alice"
+      },
+      "note": "Empty body still signed."
+    },
+    {
+      "id": "signed-single-line-max",
+      "circle": "main",
+      "signer": "alice",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "lines": [
+        "S2S.sigi.ALPiTm8nCvQ7EcBRzw3woVFftqnHKkD5xZYOa2N5cY0fAus9ggh41haUFiUP4ZFQ3pWqzB6-AecEfDm1nu-oitwv6WHU0i1KuiDaPyTDBVofVSAWAazwwrtRVIR2MlcIgntrX_ZWUCcAR_DEF5LTD9JctP_CdM8Vz8xRcUmYXH52hFGJxQKOxFXHUozWP6FCOwkaIW19hGH58EdrvD368sN4DB0EaRhY5IMsMgcwsd7PJ6vW7pPQbMY"
+      ],
+      "parts": [
+        {
+          "token": "S2S.sigi.ALPiTm8nCvQ7EcBRzw3woVFftqnHKkD5xZYOa2N5cY0fAus9ggh41haUFiUP4ZFQ3pWqzB6-AecEfDm1nu-oitwv6WHU0i1KuiDaPyTDBVofVSAWAazwwrtRVIR2MlcIgntrX_ZWUCcAR_DEF5LTD9JctP_CdM8Vz8xRcUmYXH52hFGJxQKOxFXHUozWP6FCOwkaIW19hGH58EdrvD368sN4DB0EaRhY5IMsMgcwsd7PJ6vW7pPQbMY",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "b3e24e6f270af43b11c051cf",
+          "aad_hex": "00534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+          "sealed_plaintext_hex": "616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161f6f1831bd6d7c989d7b04b8e229b979e6594a09e61c7b78de5afc7b0960bdb76208ccf025c7dbaa21aa1726ef5b1901b672ba91080bf089c8596d63206b3fc083fc8a1f67622140c",
+          "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "keyid_hex": "f6f1831bd6d7c989",
+      "sig_hex": "d7b04b8e229b979e6594a09e61c7b78de5afc7b0960bdb76208ccf025c7dbaa21aa1726ef5b1901b672ba91080bf089c8596d63206b3fc083fc8a1f67622140c",
+      "signed_bytes_hex": "534947494c2e76322e73696700001c534947494c2e76322e532e736967696c2d766563746f722d74657374f6f1831bd6d7c9890101000054616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+      "joined": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": {
+        "verified": true,
+        "signer": "Alice"
+      },
+      "note": "Longest ASCII body (84 B) that fits one S2S line with its trailer at max_line=256."
+    },
+    {
+      "id": "signed-whisper-single-max",
+      "circle": "main",
+      "signer": "alice",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 234,
+        "sender": ""
+      },
+      "plaintext": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
+      "lines": [
+        "S2S.sigi.AIymyUKFkOXcRLPqugToZMDM5C8DRNZ-EyIKvKzEnxU1uKOmJNYbVPUAuoY4FzDTr5eNp6Tl7P_regR9oANrqiaABMvDWIRok01XOkGLyDSYPoYIPSMyaj1nIIDQqB4G3pxTVwl-RrWpD_vPp9X2lz7NRV3QGMmADFMYC0HT0n9WlR0Vc1uiM8_wuLTxZvK6kaW8S0Zmq83nV4ltSnhm7eWcLh7Fji0m"
+      ],
+      "parts": [
+        {
+          "token": "S2S.sigi.AIymyUKFkOXcRLPqugToZMDM5C8DRNZ-EyIKvKzEnxU1uKOmJNYbVPUAuoY4FzDTr5eNp6Tl7P_regR9oANrqiaABMvDWIRok01XOkGLyDSYPoYIPSMyaj1nIIDQqB4G3pxTVwl-RrWpD_vPp9X2lz7NRV3QGMmADFMYC0HT0n9WlR0Vc1uiM8_wuLTxZvK6kaW8S0Zmq83nV4ltSnhm7eWcLh7Fji0m",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "8ca6c9428590e5dc44b3eaba",
+          "aad_hex": "00534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777",
+          "sealed_plaintext_hex": "77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777f6f1831bd6d7c9891c4268d11271439c81ff11a9ccda05ae3196bf6d0d07cee2b7aa3d22603e6772127e10b0a0cd6ebb9f5b92144b0d9fe3edcecdc128b8c7835dfa48282175420b",
+          "plaintext": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww"
+        }
+      ],
+      "keyid_hex": "f6f1831bd6d7c989",
+      "sig_hex": "1c4268d11271439c81ff11a9ccda05ae3196bf6d0d07cee2b7aa3d22603e6772127e10b0a0cd6ebb9f5b92144b0d9fe3edcecdc128b8c7835dfa48282175420b",
+      "signed_bytes_hex": "534947494c2e76322e73696700001c534947494c2e76322e532e736967696c2d766563746f722d74657374f6f1831bd6d7c989010100004377777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777",
+      "joined": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
+      "expect": {
+        "verified": true,
+        "signer": "Alice"
+      },
+      "note": "Whisper budget (max_line=234): 67 B in one signed line."
+    },
+    {
+      "id": "signature-only-part",
+      "circle": "main",
+      "signer": "alice",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "lines": [
+        "S2S.sigi.BAG0u8XAERlem6gS4p9d7v42NZGwRjUxUygcyKU9OSGmw52TbWx4WERuG6p2RHoy8CjbuNjDXbv7v3-eLAu0DI42WWYN4xfNzMHh8OD6Wg9fa2aNM7Eg2Ftbu9SvAZbELvJabqduOXsoJL2pM6Pc3K5ag9XXY5q_xA",
+        "S2S.sigi.BBG0u8XAERnnvAMJRdzLI4yRY7WzIlj2RINEmfzcaNHhVKcuJv-nbH9HelcQAQDhUty6w1fU0hXSOuunvE92vLcuxqoNdafg-T7uW6_adlWxr7HpIgp7gMFs9sWlUFC_khy0sSuRojQPCryv"
+      ],
+      "parts": [
+        {
+          "token": "S2S.sigi.BAG0u8XAERlem6gS4p9d7v42NZGwRjUxUygcyKU9OSGmw52TbWx4WERuG6p2RHoy8CjbuNjDXbv7v3-eLAu0DI42WWYN4xfNzMHh8OD6Wg9fa2aNM7Eg2Ftbu9SvAZbELvJabqduOXsoJL2pM6Pc3K5ag9XXY5q_xA",
+          "index": 1,
+          "total": 2,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "0401b4bbc5c01119",
+          "mid_hex": "b4bbc5c01119",
+          "nonce_hex": "5e9ba812e29f5deefe363591",
+          "aad_hex": "0401b4bbc5c01119534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "61616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+          "sealed_plaintext_hex": "61616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+          "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "token": "S2S.sigi.BBG0u8XAERnnvAMJRdzLI4yRY7WzIlj2RINEmfzcaNHhVKcuJv-nbH9HelcQAQDhUty6w1fU0hXSOuunvE92vLcuxqoNdafg-T7uW6_adlWxr7HpIgp7gMFs9sWlUFC_khy0sSuRojQPCryv",
+          "index": 2,
+          "total": 2,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "0411b4bbc5c01119",
+          "mid_hex": "b4bbc5c01119",
+          "nonce_hex": "e7bc030945dccb238c9163b5",
+          "aad_hex": "0411b4bbc5c01119534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "",
+          "sealed_plaintext_hex": "f6f1831bd6d7c9896d3d863819f31a7bd287cebc0e0c8887e83e421e9891aad23af0d0500ae592a7c261c8d9e2a7440e2353fefab8bec0244e387bbfb884767432955b781275c200",
+          "plaintext": ""
+        }
+      ],
+      "keyid_hex": "f6f1831bd6d7c989",
+      "sig_hex": "6d3d863819f31a7bd287cebc0e0c8887e83e421e9891aad23af0d0500ae592a7c261c8d9e2a7440e2353fefab8bec0244e387bbfb884767432955b781275c200",
+      "signed_bytes_hex": "534947494c2e76322e73696700001c534947494c2e76322e532e736967696c2d766563746f722d74657374f6f1831bd6d7c98902080401b4bbc5c01119005561616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161080411b4bbc5c011190000",
+      "joined": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": {
+        "verified": true,
+        "signer": "Alice"
+      },
+      "note": "One byte more than one line: part 1 carries the text, part 2 only the trailer."
+    },
+    {
+      "id": "trailer-in-last-part",
+      "circle": "main",
+      "signer": "alice",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "lines": [
+        "S2S.sigi.BAFJko4LJ4UTctpAKEdYuDg4fP0UHUkUsqMD2UWgTXGzvee4NLWzih4jRx3dQ4i4XVQ9I34Ke0GTmNuFzOX7uavKyc8WYlzFZDNBjBZDE6GitpeCFDu_UwmohgdIqsdGFeXXkeJ3KZk1QFqxlZOddlZpLbNeOB3zAx35WqVgPr-2YyZatXzoMxn88292121plIkun0Ptusvz_yms_dTskqp84Rx7TwzT7vQlZNz01Ew25viC-yyc_Bo",
+        "S2S.sigi.BBFJko4LJ4XCbVGZE2wnr4V_UzvY_PK_LrOccw7vwtkKYy6CnNORpihAMnEkkoiOjhnENCUyMRXsS3A6flvADS3ZB8Bs-J0ZGeQ6_9YmguBulXNzi-IdgiRwsDM0OLpfykVMN1PV7EMb62VmDB0nY1j7q7dV6zGCNfC7ErjSsQBlUvE2g1dalKFnwsQKxPWAfnG-khtOuNbbNXV7FdNLCSYdK42MBKjKxK2N92lKR_Zc2KrLSxDRE8I"
+      ],
+      "parts": [
+        {
+          "token": "S2S.sigi.BAFJko4LJ4UTctpAKEdYuDg4fP0UHUkUsqMD2UWgTXGzvee4NLWzih4jRx3dQ4i4XVQ9I34Ke0GTmNuFzOX7uavKyc8WYlzFZDNBjBZDE6GitpeCFDu_UwmohgdIqsdGFeXXkeJ3KZk1QFqxlZOddlZpLbNeOB3zAx35WqVgPr-2YyZatXzoMxn88292121plIkun0Ptusvz_yms_dTskqp84Rx7TwzT7vQlZNz01Ew25viC-yyc_Bo",
+          "index": 1,
+          "total": 2,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "040149928e0b2785",
+          "mid_hex": "49928e0b2785",
+          "nonce_hex": "1372da40284758b838387cfd",
+          "aad_hex": "040149928e0b2785534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "6363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363",
+          "sealed_plaintext_hex": "6363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363",
+          "plaintext": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        {
+          "token": "S2S.sigi.BBFJko4LJ4XCbVGZE2wnr4V_UzvY_PK_LrOccw7vwtkKYy6CnNORpihAMnEkkoiOjhnENCUyMRXsS3A6flvADS3ZB8Bs-J0ZGeQ6_9YmguBulXNzi-IdgiRwsDM0OLpfykVMN1PV7EMb62VmDB0nY1j7q7dV6zGCNfC7ErjSsQBlUvE2g1dalKFnwsQKxPWAfnG-khtOuNbbNXV7FdNLCSYdK42MBKjKxK2N92lKR_Zc2KrLSxDRE8I",
+          "index": 2,
+          "total": 2,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "041149928e0b2785",
+          "mid_hex": "49928e0b2785",
+          "nonce_hex": "c26d5199136c27af857f533b",
+          "aad_hex": "041149928e0b2785534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "6363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363",
+          "sealed_plaintext_hex": "6363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363f6f1831bd6d7c9896038087509a79c532755752167b461fda81c1400a5b7de43dd49bcd19bfbfc58a5b80d87fbdb894070ef44b362dedd174aaf7f56629737324906609ef4926b09",
+          "plaintext": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+      ],
+      "keyid_hex": "f6f1831bd6d7c989",
+      "sig_hex": "6038087509a79c532755752167b461fda81c1400a5b7de43dd49bcd19bfbfc58a5b80d87fbdb894070ef44b362dedd174aaf7f56629737324906609ef4926b09",
+      "signed_bytes_hex": "534947494c2e76322e73696700001c534947494c2e76322e532e736967696c2d766563746f722d74657374f6f1831bd6d7c9890208040149928e0b27850095636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636308041149928e0b2785004d6363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363",
+      "joined": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "expect": {
+        "verified": true,
+        "signer": "Alice"
+      },
+      "note": "226 B: two parts, the trailer fills the rest of part 2."
+    },
+    {
+      "id": "trailer-spills",
+      "circle": "main",
+      "signer": "alice",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "lines": [
+        "S2S.sigi.BAKHJ9jfpEVILzo_N5EM4e5HAxDLEXLfq4g75DVABcSMPMrxbWejGedGcdrhEcxkN37OyZcs7GMZhx_npyXLUurgl8pJxdDOarwezOIi7Oqz4dhr2j9oVdGXJH7Nmtwd7v8AV0AyHnNo7vawSixstSbJ47xuSpC09DJ_3s1RW9xbAPdUYYNThpfFOX31AooVre_JJ0niC0eJ6B3pCP4hx8OOBYsaWQNxriroFUKaUlKwlvrd2rJs3Tw",
+        "S2S.sigi.BBKHJ9jfpEWbXTMUhPXSLuqVBL49yUge_gY8hPYU5oSTQZABzQ_6v63ZUMS8ekFAOaAapn89ZTBdcpznO9djgSPDI2J_HiiQOcBHkQP5p-N0CV_5cc0yrqbEtpGa_WewHM7bBYw1zrtse_srhKibu5D_",
+        "S2S.sigi.BCKHJ9jfpEU_IEiaqQ4Yl7bwpHF59uGjbkHgV3ZvxXXrW9iILQI83Gdo-MN_tQcYGWRLEacm2n_qhB0Xi6oru8N4FH-tJ3H5U8yc-VhyNtQyZcq6ioS5Pnl4TTekSgk6xCLFhygwF17Z2zKh"
+      ],
+      "parts": [
+        {
+          "token": "S2S.sigi.BAKHJ9jfpEVILzo_N5EM4e5HAxDLEXLfq4g75DVABcSMPMrxbWejGedGcdrhEcxkN37OyZcs7GMZhx_npyXLUurgl8pJxdDOarwezOIi7Oqz4dhr2j9oVdGXJH7Nmtwd7v8AV0AyHnNo7vawSixstSbJ47xuSpC09DJ_3s1RW9xbAPdUYYNThpfFOX31AooVre_JJ0niC0eJ6B3pCP4hx8OOBYsaWQNxriroFUKaUlKwlvrd2rJs3Tw",
+          "index": 1,
+          "total": 3,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "04028727d8dfa445",
+          "mid_hex": "8727d8dfa445",
+          "nonce_hex": "482f3a3f37910ce1ee470310",
+          "aad_hex": "04028727d8dfa445534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "6363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363",
+          "sealed_plaintext_hex": "6363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363",
+          "plaintext": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        {
+          "token": "S2S.sigi.BBKHJ9jfpEWbXTMUhPXSLuqVBL49yUge_gY8hPYU5oSTQZABzQ_6v63ZUMS8ekFAOaAapn89ZTBdcpznO9djgSPDI2J_HiiQOcBHkQP5p-N0CV_5cc0yrqbEtpGa_WewHM7bBYw1zrtse_srhKibu5D_",
+          "index": 2,
+          "total": 3,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "04128727d8dfa445",
+          "mid_hex": "8727d8dfa445",
+          "nonce_hex": "9b5d331484f5d22eea9504be",
+          "aad_hex": "04128727d8dfa445534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363",
+          "sealed_plaintext_hex": "636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363",
+          "plaintext": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        {
+          "token": "S2S.sigi.BCKHJ9jfpEU_IEiaqQ4Yl7bwpHF59uGjbkHgV3ZvxXXrW9iILQI83Gdo-MN_tQcYGWRLEacm2n_qhB0Xi6oru8N4FH-tJ3H5U8yc-VhyNtQyZcq6ioS5Pnl4TTekSgk6xCLFhygwF17Z2zKh",
+          "index": 3,
+          "total": 3,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "04228727d8dfa445",
+          "mid_hex": "8727d8dfa445",
+          "nonce_hex": "3f20489aa90e1897b6f0a471",
+          "aad_hex": "04228727d8dfa445534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "",
+          "sealed_plaintext_hex": "f6f1831bd6d7c98982630f4da10feb7299c860da3cff67e16ef38f22faac4154908c32061d19b99f4f5410528057d496ad6ab0d3c1206b2eacb69284a065384c350f1c4d6780ad03",
+          "plaintext": ""
+        }
+      ],
+      "keyid_hex": "f6f1831bd6d7c989",
+      "sig_hex": "82630f4da10feb7299c860da3cff67e16ef38f22faac4154908c32061d19b99f4f5410528057d496ad6ab0d3c1206b2eacb69284a065384c350f1c4d6780ad03",
+      "signed_bytes_hex": "534947494c2e76322e73696700001c534947494c2e76322e532e736967696c2d766563746f722d74657374f6f1831bd6d7c989030804028727d8dfa445009563636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363630804128727d8dfa445004e6363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363630804228727d8dfa4450000",
+      "joined": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "expect": {
+        "verified": true,
+        "signer": "Alice"
+      },
+      "note": "One byte more: a third, signature-only part."
+    },
+    {
+      "id": "signed-multipart-3",
+      "circle": "main",
+      "signer": "bob",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij",
+      "lines": [
+        "S2S.sigi.BANyCV49yf1fF1X_2yLxE9-cknXMW91ktgpJQBL2JXQ9oluGQg8TIK5NgKyAm0YRtxeBFfkJ0DA4sw6Bo1dhDkKBLUBBzR2Gy0_UgWrMatD1TbNwIF_JBFsBYVO_bmrP_1G4pVP7zHJ17M8Upp09ActVkOF9ANpdRj5V9dGUjJj7SN9bWQ1WkBflqbLGq3JC6ltpwCuLmX8IaIzh4tUNy7E6XwRulGX0oelbIWz2F5b4qMap6828S_0",
+        "S2S.sigi.BBNyCV49yf26Bi3xDEIIydJrb9NIpwcVds4rhVjAydfzyPcP46fijRSo5QTyiynyixBEC8g1IhEYosRen2XRZSBU4DCMCzqVCK85s9oRH5PyMYc-W1hLreD253KiV0UnIS3zCTmZqvTex5pXTylvYHCrRgHAFuev9JWFJuaaXvkekgwCeUyEEgxp2JOxU8VK3M6wzKwAVRO7-bBXKYgTWR2Z2NytKAUDONvgeNrg3g1ljBs6E6YliQE",
+        "S2S.sigi.BCNyCV49yf2dRAVx2xS40CQrzGaU7RVEwc2gdgPqnSuLXMq4aqMThxGD1O595NvlNsG3h_VBnc3boQ_FB8QRCKsWORFFhHszX40JfNuv7L9zuQd3-uS7k8pqf2fo_rLNKlB89hZoyfpidH7tcAynckpE6QHszBz32xHWlNhkjDHPblm4gkZtofue",
+        "S2S.sigi.BDNyCV49yf1zq3nBk3SOBHSNv6S0IDxK6RHvOTCebNOIQtCfT6lB3yDGWYC6vGuRonqIIDec6krgMuZA-GKfYbWW9VQm9rkFD5mLnRMnnPEdcWYbJbgTJBrpxtrCs8v3dEe7A8pBd3err68a"
+      ],
+      "parts": [
+        {
+          "token": "S2S.sigi.BANyCV49yf1fF1X_2yLxE9-cknXMW91ktgpJQBL2JXQ9oluGQg8TIK5NgKyAm0YRtxeBFfkJ0DA4sw6Bo1dhDkKBLUBBzR2Gy0_UgWrMatD1TbNwIF_JBFsBYVO_bmrP_1G4pVP7zHJ17M8Upp09ActVkOF9ANpdRj5V9dGUjJj7SN9bWQ1WkBflqbLGq3JC6ltpwCuLmX8IaIzh4tUNy7E6XwRulGX0oelbIWz2F5b4qMap6828S_0",
+          "index": 1,
+          "total": 4,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "040372095e3dc9fd",
+          "mid_hex": "72095e3dc9fd",
+          "nonce_hex": "5f1755ffdb22f113df9c9275",
+          "aad_hex": "040372095e3dc9fd534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a616263646566676869",
+          "sealed_plaintext_hex": "6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a616263646566676869",
+          "plaintext": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghi"
+        },
+        {
+          "token": "S2S.sigi.BBNyCV49yf26Bi3xDEIIydJrb9NIpwcVds4rhVjAydfzyPcP46fijRSo5QTyiynyixBEC8g1IhEYosRen2XRZSBU4DCMCzqVCK85s9oRH5PyMYc-W1hLreD253KiV0UnIS3zCTmZqvTex5pXTylvYHCrRgHAFuev9JWFJuaaXvkekgwCeUyEEgxp2JOxU8VK3M6wzKwAVRO7-bBXKYgTWR2Z2NytKAUDONvgeNrg3g1ljBs6E6YliQE",
+          "index": 2,
+          "total": 4,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "041372095e3dc9fd",
+          "mid_hex": "72095e3dc9fd",
+          "nonce_hex": "ba062df10c4208c9d26b6fd3",
+          "aad_hex": "041372095e3dc9fd534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "6a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768",
+          "sealed_plaintext_hex": "6a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768",
+          "plaintext": "jabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefgh"
+        },
+        {
+          "token": "S2S.sigi.BCNyCV49yf2dRAVx2xS40CQrzGaU7RVEwc2gdgPqnSuLXMq4aqMThxGD1O595NvlNsG3h_VBnc3boQ_FB8QRCKsWORFFhHszX40JfNuv7L9zuQd3-uS7k8pqf2fo_rLNKlB89hZoyfpidH7tcAynckpE6QHszBz32xHWlNhkjDHPblm4gkZtofue",
+          "index": 3,
+          "total": 4,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "042372095e3dc9fd",
+          "mid_hex": "72095e3dc9fd",
+          "nonce_hex": "9d440571db14b8d0242bcc66",
+          "aad_hex": "042372095e3dc9fd534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a",
+          "sealed_plaintext_hex": "696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a",
+          "plaintext": "ijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij"
+        },
+        {
+          "token": "S2S.sigi.BDNyCV49yf1zq3nBk3SOBHSNv6S0IDxK6RHvOTCebNOIQtCfT6lB3yDGWYC6vGuRonqIIDec6krgMuZA-GKfYbWW9VQm9rkFD5mLnRMnnPEdcWYbJbgTJBrpxtrCs8v3dEe7A8pBd3err68a",
+          "index": 4,
+          "total": 4,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "043372095e3dc9fd",
+          "mid_hex": "72095e3dc9fd",
+          "nonce_hex": "73ab79c193748e04748dbfa4",
+          "aad_hex": "043372095e3dc9fd534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "",
+          "sealed_plaintext_hex": "a58aba500e1f1d693bc9b617e33f81e1d357082ea9061bb40a0534dcf777486bbcab5a05d84a4ce7c964d5dc63e0149a605a13f0db5adc4834f95585e74837a5e936d6ba22fadb0e",
+          "plaintext": ""
+        }
+      ],
+      "keyid_hex": "a58aba500e1f1d69",
+      "sig_hex": "3bc9b617e33f81e1d357082ea9061bb40a0534dcf777486bbcab5a05d84a4ce7c964d5dc63e0149a605a13f0db5adc4834f95585e74837a5e936d6ba22fadb0e",
+      "signed_bytes_hex": "534947494c2e76322e73696700001c534947494c2e76322e532e736967696c2d766563746f722d74657374a58aba500e1f1d690408040372095e3dc9fd00956162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a61626364656667686908041372095e3dc9fd00956a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a616263646566676808042372095e3dc9fd0066696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a08043372095e3dc9fd0000",
+      "joined": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij",
+      "expect": {
+        "verified": true,
+        "signer": "Bob"
+      },
+      "note": "Several parts; the signature covers every header and part plaintext."
+    },
+    {
+      "id": "signed-unicode",
+      "circle": "main",
+      "signer": "alice",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "Grüße 🧭 北 -320 / ñ / שלום / é",
+      "lines": [
+        "S2S.sigi.ABRlVymz0b3PBqVSMCNHO1sHkcVz2MscBXWa_AIvAxwzWgz_x82BXSrkzYvcaXEUcQiB7rWa0MBFfEA5Pd03K2uiShdC8Q7NJShW5n4IjAtnZf-eavsyOk1BRkzoiWp1J_curTwrmKr14d9wEaqBVNVnv-gHsYAutWVW7t-rGjWPxZfyafWr58nucBZmyIKi"
+      ],
+      "parts": [
+        {
+          "token": "S2S.sigi.ABRlVymz0b3PBqVSMCNHO1sHkcVz2MscBXWa_AIvAxwzWgz_x82BXSrkzYvcaXEUcQiB7rWa0MBFfEA5Pd03K2uiShdC8Q7NJShW5n4IjAtnZf-eavsyOk1BRkzoiWp1J_curTwrmKr14d9wEaqBVNVnv-gHsYAutWVW7t-rGjWPxZfyafWr58nucBZmyIKi",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "14655729b3d1bdcf06a55230",
+          "aad_hex": "00534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "4772c3bcc39f6520f09fa7ad20e58c97202d333230202f20c3b1202f20d7a9d79cd795d79d202f2065cc81",
+          "sealed_plaintext_hex": "4772c3bcc39f6520f09fa7ad20e58c97202d333230202f20c3b1202f20d7a9d79cd795d79d202f2065cc81f6f1831bd6d7c989c4270d412481414745c3c79e9c1d0ecee73c24715b0e5b41bee6d46af2b41fbc10761fceb7dea27a66fe5951f221350b75198ef0270b0bd965e3658141f1c405",
+          "plaintext": "Grüße 🧭 北 -320 / ñ / שלום / é"
+        }
+      ],
+      "keyid_hex": "f6f1831bd6d7c989",
+      "sig_hex": "c4270d412481414745c3c79e9c1d0ecee73c24715b0e5b41bee6d46af2b41fbc10761fceb7dea27a66fe5951f221350b75198ef0270b0bd965e3658141f1c405",
+      "signed_bytes_hex": "534947494c2e76322e73696700001c534947494c2e76322e532e736967696c2d766563746f722d74657374f6f1831bd6d7c989010100002b4772c3bcc39f6520f09fa7ad20e58c97202d333230202f20c3b1202f20d7a9d79cd795d79d202f2065cc81",
+      "joined": "Grüße 🧭 北 -320 / ñ / שלום / é",
+      "expect": {
+        "verified": true,
+        "signer": "Alice"
+      },
+      "note": "Multi-byte UTF-8."
+    },
+    {
+      "id": "signed-compact",
+      "circle": "main",
+      "signer": "alice",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "seal": {
+        "compact": true,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon",
+      "lines": [
+        "S2S.sigi.AZz1bxm-eH_RBlS-6uOgwsfMvWlBNzIoCgfiGLKKfLCGhXLC9EDdxZHCux0QJU-jywLjQldbAFb6uejvGp92vF2EFVor6sWqvG3IIwbotkNQgI9UNur7Nw_b9VX-0PlCohuPLVBDBv3dA5Trq-AVHG9_VLUEINUwRjXo-2P5RE7G9Ikng_hKDWShaou37rb05vSAuyoWTdtPj9-KMyyDk5RDDkO4rQmAujMW"
+      ],
+      "parts": [
+        {
+          "token": "S2S.sigi.AZz1bxm-eH_RBlS-6uOgwsfMvWlBNzIoCgfiGLKKfLCGhXLC9EDdxZHCux0QJU-jywLjQldbAFb6uejvGp92vF2EFVor6sWqvG3IIwbotkNQgI9UNur7Nw_b9VX-0PlCohuPLVBDBv3dA5Trq-AVHG9_VLUEINUwRjXo-2P5RE7G9Ikng_hKDWShaou37rb05vSAuyoWTdtPj9-KMyyDk5RDDkO4rQmAujMW",
+          "index": 1,
+          "total": 1,
+          "flags": 1,
+          "codebook": true,
+          "join": false,
+          "sender": null,
+          "header_hex": "01",
+          "mid_hex": "",
+          "nonce_hex": "9cf56f19be787fd10654beea",
+          "aad_hex": "01534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "c2001006044401809c49404a2c45052a024083d50120120800200c0888030138928094588a0a54048107aa024024100040181110060271250128b11414a809020f5404804827",
+          "sealed_plaintext_hex": "c2001006044401809c49404a2c45052a024083d50120120800200c0888030138928094588a0a54048107aa024024100040181110060271250128b11414a809020f5404804827f6f1831bd6d7c9891a06b5fa05b18e169ba345a1e06a52b94bb72a0bec390f61651abb2d3f7f5c95a080504d639308a7bbcb8b9d63d3d70d377c191befece56f7d8c62a3295ee807",
+          "plaintext": "nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon"
+        }
+      ],
+      "keyid_hex": "f6f1831bd6d7c989",
+      "sig_hex": "1a06b5fa05b18e169ba345a1e06a52b94bb72a0bec390f61651abb2d3f7f5c95a080504d639308a7bbcb8b9d63d3d70d377c191befece56f7d8c62a3295ee807",
+      "signed_bytes_hex": "534947494c2e76322e73696700001c534947494c2e76322e532e736967696c2d766563746f722d74657374f6f1831bd6d7c9890101010046c2001006044401809c49404a2c45052a024083d50120120800200c0888030138928094588a0a54048107aa024024100040181110060271250128b11414a809020f5404804827",
+      "joined": "nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon nether roof stash at 0 128 0 bring the diamond pickaxe and the eye of ender meet at the ruined portal after dragon",
+      "expect": {
+        "verified": true,
+        "signer": "Alice"
+      },
+      "note": "Codebook parts: the signature covers the packed bytes."
+    },
+    {
+      "id": "signed-sender",
+      "circle": "main",
+      "signer": "alice",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": "Alice"
+      },
+      "plaintext": "anon or not",
+      "lines": [
+        "S2S.sigi.CJ8HTzosc8oGXl9fIg1NlrmXZvS2D-eLBeSsi7eD8QuyGQHe-W_fiP4OsyIb3ZUA5yVnLLkpnUWCwPx9HNUr3Jw-2IxkGH4hXvBwnoJZ2vxeO-wKNjVbTpfo1vPFAUGw_feg-RFCk7rQSQIIGsuK7BVO3IEEIg"
+      ],
+      "parts": [
+        {
+          "token": "S2S.sigi.CJ8HTzosc8oGXl9fIg1NlrmXZvS2D-eLBeSsi7eD8QuyGQHe-W_fiP4OsyIb3ZUA5yVnLLkpnUWCwPx9HNUr3Jw-2IxkGH4hXvBwnoJZ2vxeO-wKNjVbTpfo1vPFAUGw_feg-RFCk7rQSQIIGsuK7BVO3IEEIg",
+          "index": 1,
+          "total": 1,
+          "flags": 8,
+          "codebook": false,
+          "join": false,
+          "sender": "Alice",
+          "header_hex": "08",
+          "mid_hex": "",
+          "nonce_hex": "9f074f3a2c73ca065e5f5f22",
+          "aad_hex": "08534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "05416c696365616e6f6e206f72206e6f74",
+          "sealed_plaintext_hex": "05416c696365616e6f6e206f72206e6f74f6f1831bd6d7c98938123c26b9e3dcacd01dcfadbac11eb150216150bf61f29da94a9c5e40b7d28639f9a9b90c170f81001ef4fd48f537aec27d40d704244ea4da8ce3339425f60f",
+          "plaintext": "anon or not"
+        }
+      ],
+      "keyid_hex": "f6f1831bd6d7c989",
+      "sig_hex": "38123c26b9e3dcacd01dcfadbac11eb150216150bf61f29da94a9c5e40b7d28639f9a9b90c170f81001ef4fd48f537aec27d40d704244ea4da8ce3339425f60f",
+      "signed_bytes_hex": "534947494c2e76322e73696700001c534947494c2e76322e532e736967696c2d766563746f722d74657374f6f1831bd6d7c989010108001105416c696365616e6f6e206f72206e6f74",
+      "joined": "anon or not",
+      "expect": {
+        "verified": true,
+        "signer": "Alice"
+      },
+      "note": "Sender field in part 1, trailer in the last part."
+    },
+    {
+      "id": "sender-claim-vs-signer",
+      "circle": "main",
+      "signer": "mallory",
+      "verifier_keys": [
+        "alice",
+        "mallory"
+      ],
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": "Alice"
+      },
+      "plaintext": "I am Alice",
+      "lines": [
+        "S2S.sigi.CCAx9G-T_nCrOFwA9T_cxc_2LAHCvA4P_bM2uHOx8NElLCzF01DVq-KsAbNLVoBnqpLgIK9w1-JclwGiai8q0sESpnP6Uxjp9cEsIDyDXMf5lL1Tp2ClV5io26spfEKH8shbnl9k7W9nPlwFUCvndx8GLMxv"
+      ],
+      "parts": [
+        {
+          "token": "S2S.sigi.CCAx9G-T_nCrOFwA9T_cxc_2LAHCvA4P_bM2uHOx8NElLCzF01DVq-KsAbNLVoBnqpLgIK9w1-JclwGiai8q0sESpnP6Uxjp9cEsIDyDXMf5lL1Tp2ClV5io26spfEKH8shbnl9k7W9nPlwFUCvndx8GLMxv",
+          "index": 1,
+          "total": 1,
+          "flags": 8,
+          "codebook": false,
+          "join": false,
+          "sender": "Alice",
+          "header_hex": "08",
+          "mid_hex": "",
+          "nonce_hex": "2031f46f93fe70ab385c00f5",
+          "aad_hex": "08534947494c2e76322e532e736967696c2d766563746f722d74657374",
+          "payload_hex": "05416c6963654920616d20416c696365",
+          "sealed_plaintext_hex": "05416c6963654920616d20416c69636555c72b6bfa2dd1c57ef6de9dfa415306fdc75101a05c2479ee8f4257b4953cffefd18c271bcdf1399285ce43a37e4d50513bc9b84a3273a55ae935089c12155536df8ca07ee0e205",
+          "plaintext": "I am Alice"
+        }
+      ],
+      "keyid_hex": "55c72b6bfa2dd1c5",
+      "sig_hex": "7ef6de9dfa415306fdc75101a05c2479ee8f4257b4953cffefd18c271bcdf1399285ce43a37e4d50513bc9b84a3273a55ae935089c12155536df8ca07ee0e205",
+      "signed_bytes_hex": "534947494c2e76322e73696700001c534947494c2e76322e532e736967696c2d766563746f722d7465737455c72b6bfa2dd1c5010108001005416c6963654920616d20416c696365",
+      "joined": "I am Alice",
+      "expect": {
+        "verified": true,
+        "signer": "Mallory"
+      },
+      "note": "Mallory's key is known and she claims 'Alice': the message verifies, and the signer is Mallory. Trust the signer, not the sender field."
+    }
+  ],
+  "negative": [
+    {
+      "id": "tampered-tag",
+      "line": "S2S.sigi.AD_HOSgzjEt2pag-HdZZEEQBWJMSG8fJ-9tVo7sHlsrdo0Yjj2j-EIRe4l5WeG9CViIQONxnXt6bxsX7Seb2Hj6YWGHNWRhQFW1ex5A2jcQJvoTItBUcMq9kb53f6pCI44iuo2MHhfbhdnYJUmhI__-SO90qJJxBpzly",
+      "reason": "GCM tag flipped (outsider)."
+    },
+    {
+      "id": "s2s-presented-as-s2c",
+      "line": "S2C.sigi.AD_HOSgzjEt2pag-HdZZEEQBWJMSG8fJ-9tVo7sHlsrdo0Yjj2j-EIRe4l5WeG9CViIQONxnXt6bxsX7Seb2Hj6YWGHNWRhQFW1ex5A2jcQJvoTItBUcMq9kb53f6pCI44iuo2MHhfbhdnYJUmhI__-SO90qJJxBpzlz",
+      "reason": "Different ctx ('SIGIL.v2.C.' vs 'SIGIL.v2.S.'): a signed token never opens as a circle token."
+    },
+    {
+      "id": "s2c-presented-as-s2s",
+      "line": "S2S.sigi.AJ-GuWIYAE6ND59-K_x-danjXsu1yBk6D1Fq2M8J7rukZvWsLzjctp--2A1BcFweSYus-Q",
+      "reason": "An unsigned S2C token relabelled S2S does not open."
+    },
+    {
+      "id": "wrong-passphrase",
+      "line": "S2S.sigi.ADjY37yw2TKF9b5y74YXnflA9Xk9FifLE2mOgDBRMWq6XJdg6Rga2OKs35q58s7ykZ4vZlpkLGbKRdKy2jNnOfeSR1QGT6VjNLcmhYzhAFjejw1BHZVUaE_4Vp0oMRQIlvg5kF-cqN3X0y6AFIjlBZZVt_-h",
+      "reason": "Signed under another circle key."
+    },
+    {
+      "id": "short-trailer",
+      "line": "S2S.sigi.AD_HOSgzjEt2pag-HZPbg_UpvNtqJnBnjjvwQDg",
+      "reason": "Last part with fewer than 72 plaintext bytes: rejected on open."
+    },
+    {
+      "id": "slug-unknown",
+      "line": "S2S.qqqq.AD_HOSgzjEt2pag-HdZZEEQBWJMSG8fJ-9tVo7sHlsrdo0Yjj2j-EIRe4l5WeG9CViIQONxnXt6bxsX7Seb2Hj6YWGHNWRhQFW1ex5A2jcQJvoTItBUcMq9kb53f6pCI44iuo2MHhfbhdnYJUmhI__-SO90qJJxBpzlz",
+      "reason": "No circle."
+    }
+  ],
+  "messages": [
+    {
+      "id": "circle-member-flips-signature",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "lines": [
+        "S2S.sigi.AD_HOSgzjEt2pag-HdZZEEQBWJMSG8fJ-9tVo7sHlsrdo0Yjj2j-EIRe4l5WeG9CViIQONxnXt6bxsX7Seb2Hj6YWGHNWRhQFW1ex5A2jcQJvoTItBUcMq9kb53f6pCI44iuo2MHhfbhdncJznmrNYDarYFegEvoEJfI"
+      ],
+      "expect": {
+        "verified": false,
+        "error": "bad-signature"
+      },
+      "reason": "A circle member re-seals the part with one signature bit flipped."
+    },
+    {
+      "id": "circle-member-edits-body",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "lines": [
+        "S2S.sigi.AD_HOSgzjEt2pag-HddZEEQBWJMSG8fJ-9tVo7sHlsrdo0Yjj2j-EIRe4l5WeG9CViIQONxnXt6bxsX7Seb2Hj6YWGHNWRhQFW1ex5A2jcQJvoTItBUcMq9kb53f6pCI44iuo2MHhfbhdnYkKy9iJbYCnbubFiavxcH1"
+      ],
+      "expect": {
+        "verified": false,
+        "error": "bad-signature"
+      },
+      "reason": "A circle member changes the text and re-seals it; the signature no longer matches."
+    },
+    {
+      "id": "impersonation-unknown-key",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "lines": [
+        "S2S.sigi.CEBlTtC8NTpLzRN-R3wcxHmjrmQuu5gcbdCMScdcNm6XGL4yEYedakdfqO3YEgJ664y4A37_phM-iWDCg_JdHRIUWsgPgMPUMpVXpXHGuZmRdq8dgalvXeSJaTtL6H_kIejSfefkPQ2JW-oPIan8uPN0pt5u"
+      ],
+      "expect": {
+        "verified": false,
+        "error": "unknown-signer"
+      },
+      "reason": "Mallory (not a known key) signs and claims sender 'Alice': refused, unknown key id."
+    },
+    {
+      "id": "impersonation-keyid-swapped",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "lines": [
+        "S2S.sigi.CEBlTtC8NTpLzRN-R3wcxHmjrmQuu5gcbdCMScf_AMbnNEQqXYedakdfqO3YEgJ664y4A37_phM-iWDCg_JdHRIUWsgPgMPUMpVXpXHGuZmRdq8dgalvXeSJaTtL6H_kIejSfecOSKWSzVq0vBfYT1X0RPAK"
+      ],
+      "expect": {
+        "verified": false,
+        "error": "bad-signature"
+      },
+      "reason": "Mallory writes Alice's key id next to her own signature: Alice's key does not verify it."
+    },
+    {
+      "id": "splice-other-message-part",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "lines": [
+        "S2S.sigi.BANyCV49yf1fF1X_2yLxE9-cknXMW91ktgpJQBL2JXQ9oluGQg8TIK5NgKyAm0YRtxeBFfkJ0DA4sw6Bo1dhDkKBLUBBzR2Gy0_UgWrMatD1TbNwIF_JBFsBYVO_bmrP_1G4pVP7zHJ17M8Upp09ActVkOF9ANpdRj5V9dGUjJj7SN9bWQ1WkBflqbLGq3JC6ltpwCuLmX8IaIzh4tUNy7E6XwRulGX0oelbIWz2F5b4qMap6828S_0",
+        "S2S.sigi.BBNyCV49yf1npF4qD0nQdC5rNTcwsTvgTsMjEZ_7-_FE-gVjT9u8Kl3pjramWUltA8E79yBAYK9C2TKIxqVnDGp46XrFmzGZuoXpQDmfcJIH0hJUSvLCy6z6aG8oRDMCFmHC34gXEfba0Qmdt2FUnoJYS6N7xGrBupGEqCVhQKZ1zLufR1v2_oatFcrzAOckIJ8PJcZAnJR_-4VWqW2Fq26ij-SstC_i1m0BrkQSt9emIjfF8sjqnMk",
+        "S2S.sigi.BCNyCV49yf2dRAVx2xS40CQrzGaU7RVEwc2gdgPqnSuLXMq4aqMThxGD1O595NvlNsG3h_VBnc3boQ_FB8QRCKsWORFFhHszX40JfNuv7L9zuQd3-uS7k8pqf2fo_rLNKlB89hZoyfpidH7tcAynckpE6QHszBz32xHWlNhkjDHPblm4gkZtofue",
+        "S2S.sigi.BDNyCV49yf1zq3nBk3SOBHSNv6S0IDxK6RHvOTCebNOIQtCfT6lB3yDGWYC6vGuRonqIIDec6krgMuZA-GKfYbWW9VQm9rkFD5mLnRMnnPEdcWYbJbgTJBrpxtrCs8v3dEe7A8pBd3err68a"
+      ],
+      "expect": {
+        "verified": false,
+        "error": "bad-signature"
+      },
+      "reason": "Part 2 of Bob's other message, re-sealed by a circle member with this message's id: the message assembles, but the signature covers the original part 2."
+    },
+    {
+      "id": "splice-without-rewrite",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "lines": [
+        "S2S.sigi.BANyCV49yf1fF1X_2yLxE9-cknXMW91ktgpJQBL2JXQ9oluGQg8TIK5NgKyAm0YRtxeBFfkJ0DA4sw6Bo1dhDkKBLUBBzR2Gy0_UgWrMatD1TbNwIF_JBFsBYVO_bmrP_1G4pVP7zHJ17M8Upp09ActVkOF9ANpdRj5V9dGUjJj7SN9bWQ1WkBflqbLGq3JC6ltpwCuLmX8IaIzh4tUNy7E6XwRulGX0oelbIWz2F5b4qMap6828S_0",
+        "S2S.sigi.BBOFRkgbLBBnpF4qD0nQdC5rNTcwsTvgTsMjEZ_7-_FE-gVjT9u8Kl3pjramWUltA8E79yBAYK9C2TKIxqVnDGp46XrFmzGZuoXpQDmfcJIH0hJUSvLCy6z6aG8oRDMCFmHC34gXEfba0Qmdt2FUnoJYS6N7xGrBupGEqCVhQKZ1zLufR1v2_oatFcrzAOckIJ8PJcZAnJR_-4VWqW2Fq26ij-SstC_i1owlVlpyRCda9q1lYvDqzls",
+        "S2S.sigi.BCNyCV49yf2dRAVx2xS40CQrzGaU7RVEwc2gdgPqnSuLXMq4aqMThxGD1O595NvlNsG3h_VBnc3boQ_FB8QRCKsWORFFhHszX40JfNuv7L9zuQd3-uS7k8pqf2fo_rLNKlB89hZoyfpidH7tcAynckpE6QHszBz32xHWlNhkjDHPblm4gkZtofue",
+        "S2S.sigi.BDNyCV49yf1zq3nBk3SOBHSNv6S0IDxK6RHvOTCebNOIQtCfT6lB3yDGWYC6vGuRonqIIDec6krgMuZA-GKfYbWW9VQm9rkFD5mLnRMnnPEdcWYbJbgTJBrpxtrCs8v3dEe7A8pBd3err68a"
+      ],
+      "expect": {
+        "verified": false,
+        "error": "incomplete"
+      },
+      "reason": "Part 2 of another message with a different id: never assembled."
+    },
+    {
+      "id": "signature-part-dropped",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "lines": [
+        "S2S.sigi.AF6bqBLin13u_jY1kbBGNTFTKBzIpT05IabDnZNtbHhYRG4bqnZEejLwKNu42MNdu_u_f54sC7QMjjZZZg3jF83MweHw4PpaD19rZo0zsSDYW1u71K8BlsQu8lpup245eyjpybgC97Xh_PCdEFHgUTEM"
+      ],
+      "expect": {
+        "verified": false,
+        "error": "unknown-signer"
+      },
+      "reason": "Signature-only part dropped by a circle member, part 1 relabelled as a single-line frame: its last 72 body bytes are read as keyid || sig, match no known key id, and nothing is shown."
+    },
+    {
+      "id": "missing-part",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "lines": [
+        "S2S.sigi.BANyCV49yf1fF1X_2yLxE9-cknXMW91ktgpJQBL2JXQ9oluGQg8TIK5NgKyAm0YRtxeBFfkJ0DA4sw6Bo1dhDkKBLUBBzR2Gy0_UgWrMatD1TbNwIF_JBFsBYVO_bmrP_1G4pVP7zHJ17M8Upp09ActVkOF9ANpdRj5V9dGUjJj7SN9bWQ1WkBflqbLGq3JC6ltpwCuLmX8IaIzh4tUNy7E6XwRulGX0oelbIWz2F5b4qMap6828S_0",
+        "S2S.sigi.BDNyCV49yf1zq3nBk3SOBHSNv6S0IDxK6RHvOTCebNOIQtCfT6lB3yDGWYC6vGuRonqIIDec6krgMuZA-GKfYbWW9VQm9rkFD5mLnRMnnPEdcWYbJbgTJBrpxtrCs8v3dEe7A8pBd3err68a"
+      ],
+      "expect": {
+        "verified": false,
+        "error": "incomplete"
+      },
+      "reason": "A part is missing: nothing is verified."
+    },
+    {
+      "id": "no-verifier-keys",
+      "verifier_keys": [],
+      "lines": [
+        "S2S.sigi.AD_HOSgzjEt2pag-HdZZEEQBWJMSG8fJ-9tVo7sHlsrdo0Yjj2j-EIRe4l5WeG9CViIQONxnXt6bxsX7Seb2Hj6YWGHNWRhQFW1ex5A2jcQJvoTItBUcMq9kb53f6pCI44iuo2MHhfbhdnYJUmhI__-SO90qJJxBpzlz"
+      ],
+      "expect": {
+        "verified": false,
+        "error": "unknown-signer"
+      },
+      "reason": "The opener holds the circle but no signing keys: the message is not attributed or shown."
+    },
+    {
+      "id": "duplicate-part-ignored",
+      "verifier_keys": [
+        "alice",
+        "bob"
+      ],
+      "lines": [
+        "S2S.sigi.BANyCV49yf1fF1X_2yLxE9-cknXMW91ktgpJQBL2JXQ9oluGQg8TIK5NgKyAm0YRtxeBFfkJ0DA4sw6Bo1dhDkKBLUBBzR2Gy0_UgWrMatD1TbNwIF_JBFsBYVO_bmrP_1G4pVP7zHJ17M8Upp09ActVkOF9ANpdRj5V9dGUjJj7SN9bWQ1WkBflqbLGq3JC6ltpwCuLmX8IaIzh4tUNy7E6XwRulGX0oelbIWz2F5b4qMap6828S_0",
+        "S2S.sigi.BANyCV49yf1fF1X_2yLxE9-cknXMW91ktgpJQBL2JXQ9oluGQg8TIK5NgKyAm0YRtxeBFfkJ0DA4sw6Bo1dhDkKBLUBBzR2Gy0_UgWrMatD1TbNwIF_JBFsBYVO_bmrP_1G4pVP7zHJ17M8Upp09ActVkOF9ANpdRj5V9dGUjJj7SN9bWQ1WkBflqbLGq3JC6ltpwCuLmX8IaIzh4tUNy7E6XwRulGX0oelbIWz2F5b4qMap6828S_0",
+        "S2S.sigi.BBNyCV49yf26Bi3xDEIIydJrb9NIpwcVds4rhVjAydfzyPcP46fijRSo5QTyiynyixBEC8g1IhEYosRen2XRZSBU4DCMCzqVCK85s9oRH5PyMYc-W1hLreD253KiV0UnIS3zCTmZqvTex5pXTylvYHCrRgHAFuev9JWFJuaaXvkekgwCeUyEEgxp2JOxU8VK3M6wzKwAVRO7-bBXKYgTWR2Z2NytKAUDONvgeNrg3g1ljBs6E6YliQE",
+        "S2S.sigi.BCNyCV49yf2dRAVx2xS40CQrzGaU7RVEwc2gdgPqnSuLXMq4aqMThxGD1O595NvlNsG3h_VBnc3boQ_FB8QRCKsWORFFhHszX40JfNuv7L9zuQd3-uS7k8pqf2fo_rLNKlB89hZoyfpidH7tcAynckpE6QHszBz32xHWlNhkjDHPblm4gkZtofue",
+        "S2S.sigi.BDNyCV49yf1zq3nBk3SOBHSNv6S0IDxK6RHvOTCebNOIQtCfT6lB3yDGWYC6vGuRonqIIDec6krgMuZA-GKfYbWW9VQm9rkFD5mLnRMnnPEdcWYbJbgTJBrpxtrCs8v3dEe7A8pBd3err68a"
+      ],
+      "expect": {
+        "verified": true,
+        "signer": "Bob"
+      },
+      "reason": "A replayed part is ignored."
+    }
+  ]
+}

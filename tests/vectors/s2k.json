@@ -1,0 +1,865 @@
+{
+  "format": "sigil-test-vectors",
+  "format_version": 1,
+  "WARNING": "PUBLIC TEST-ONLY KEY MATERIAL. These signet private keys (P-256 and Ed25519) are derived from public labels ('sigil-public-test-signet-<name>-...-DO-NOT-USE') and published on purpose for cross-implementation testing. They are NOT keys. Never use them for real messages. Circle passphrases likewise.",
+  "suite": "S2K signet messages (static-static P-256 ECDH)",
+  "protocol": "S2",
+  "aad_prefix": "SIGIL.v2",
+  "sigil_version": "0.5.0",
+  "generator": "tools/make_vectors.py --suite s2k (records real sigil.seal_to_signet_s2 output; random nonces/ids; deterministic public test keys)",
+  "lexicon_v2_sha256": "46137094c869354a1c280884c80157d093f271e6bcab0a353516d5a524ec2278",
+  "key": {
+    "ctx": "UTF-8('SIGIL.v2.K.' + from_short + '.' + to_short)",
+    "ikm": "ECDH-P256(from_sk, to_pk): 32-byte x coordinate",
+    "hkdf": "HKDF-SHA256(ikm, salt=none (32 zero bytes), info = ctx || from_pk33 || to_pk33, L=32)",
+    "aad": "header || ctx",
+    "token": "S2K.<to_short>.<from_short>.<blob>",
+    "short": "b64url(SHA-256(pk33))[0:4].lower()",
+    "fingerprint": "b64url(SHA-256(pk33)) (43 chars)"
+  },
+  "fields": {
+    "signets[]": "public test signets; record = sigil keyring JSON; jwk/sk_hex = same P-256 key",
+    "directions[]": "ctx, ECDH x, HKDF info and resulting AES key per direction",
+    "positive[].opener": "which signets the opener owns and which contacts it holds",
+    "positive[].parts[].from": "contact name sigil reports as the proven sender",
+    "negative[]": "every line must FAIL to open with the given opener keyring"
+  },
+  "signets": [
+    {
+      "id": "alice",
+      "label": "sigil-public-test-signet-alice-DO-NOT-USE",
+      "record": {
+        "kind": "signet",
+        "name": "Alice",
+        "short": "n9fw",
+        "pk": "AifYxQ6lKEZ_CEtcc_h9tYD5RBTS1xNEOS-DEFAPRU1_",
+        "sk_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQglhPd2n3Vxgro2Kux\nsSliueA7hHJh5nHhOY1AYMKC9UKhRANCAAQn2MUOpShGfwhLXHP4fbWA+UQU0tcT\nRDkvgxBQD0VNf1MXOQ2smjVAJbG2XzqXUvM63gKQQXnZ4Aw40q5aqqgS\n-----END PRIVATE KEY-----\n",
+        "curve": "P-256",
+        "created": "2026-09-27T00:00:00Z",
+        "sign_alg": "Ed25519",
+        "sign_pk": "VWSTYIimkXuPDNc2T7a8uwMdXqkJNjQTHOYB1Q064IQ",
+        "sign_short": "9vgd",
+        "sign_sk_pem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIID1Uy0uF9D+L48AA5dGtpOT5ydm8cpZhrG4yA5J+sDL\n-----END PRIVATE KEY-----\n"
+      },
+      "name": "Alice",
+      "short": "n9fw",
+      "pk": "AifYxQ6lKEZ_CEtcc_h9tYD5RBTS1xNEOS-DEFAPRU1_",
+      "fingerprint": "n9fwDNm0I8g-34RDxSCmCvkNkub0iz3hSoxeezKAQsg",
+      "sk_hex": "9613ddda7dd5c60ae8d8abb1b12962b9e03b847261e671e1398d4060c282f542",
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "J9jFDqUoRn8IS1xz-H21gPlEFNLXE0Q5L4MQUA9FTX8",
+        "y": "Uxc5DayaNUAlsbZfOpdS8zreApBBedngDDjSrlqqqBI",
+        "d": "lhPd2n3Vxgro2KuxsSliueA7hHJh5nHhOY1AYMKC9UI"
+      },
+      "sign_pk": "VWSTYIimkXuPDNc2T7a8uwMdXqkJNjQTHOYB1Q064IQ",
+      "sign_short": "9vgd",
+      "sign_fingerprint": "9vGDG9bXyYns7F9FlHr28q110nxPmSZOrxM2_BuPFUU",
+      "sign_keyid_hex": "f6f1831bd6d7c989",
+      "sign_seed_hex": "80f5532d2e17d0fe2f8f00039746b69393e72766f1ca5986b1b8c80e49fac0cb",
+      "sign_jwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "VWSTYIimkXuPDNc2T7a8uwMdXqkJNjQTHOYB1Q064IQ",
+        "d": "gPVTLS4X0P4vjwADl0a2k5PnJ2bxylmGsbjIDkn6wMs"
+      },
+      "announcement": "S2+PK.Alice.n9fw.AifYxQ6lKEZ_CEtcc_h9tYD5RBTS1xNEOS-DEFAPRU1_.VWSTYIimkXuPDNc2T7a8uwMdXqkJNjQTHOYB1Q064IQ"
+    },
+    {
+      "id": "bob",
+      "label": "sigil-public-test-signet-bob-DO-NOT-USE",
+      "record": {
+        "kind": "signet",
+        "name": "Bob",
+        "short": "ofiz",
+        "pk": "Ai7HfEHjBIVvBv2Hm7U_gDtoGoK7EGm2Oy5Lh_rvWjkp",
+        "sk_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgYskKSs/61rOQArJH\nm0kBClhgy7P1Q0WOwDRM8irlXFChRANCAAQux3xB4wSFbwb9h5u1P4A7aBqCuxBp\ntjsuS4f671o5KRJnjszKA78CMd+cdtjVmsM7R9boeyQiKbDpiYj4FRKQ\n-----END PRIVATE KEY-----\n",
+        "curve": "P-256",
+        "created": "2026-09-27T00:00:00Z",
+        "sign_alg": "Ed25519",
+        "sign_pk": "7RVgvDNjJlsgD1FH6K5ezWORw_W3oo2BuQWtb9jA7ts",
+        "sign_short": "pyq6",
+        "sign_sk_pem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIGBgYTIQpsiGFSw6uE1ui/+INHD67/YvLs7x7s3XKEDR\n-----END PRIVATE KEY-----\n"
+      },
+      "name": "Bob",
+      "short": "ofiz",
+      "pk": "Ai7HfEHjBIVvBv2Hm7U_gDtoGoK7EGm2Oy5Lh_rvWjkp",
+      "fingerprint": "Ofiz13kM-g-tXZbIX5xqdC2GjPWPrUbWFsPvlC28h1U",
+      "sk_hex": "62c90a4acffad6b39002b2479b49010a5860cbb3f543458ec0344cf22ae55c50",
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "Lsd8QeMEhW8G_YebtT-AO2gagrsQabY7LkuH-u9aOSk",
+        "y": "EmeOzMoDvwIx35x22NWawztH1uh7JCIpsOmJiPgVEpA",
+        "d": "YskKSs_61rOQArJHm0kBClhgy7P1Q0WOwDRM8irlXFA"
+      },
+      "sign_pk": "7RVgvDNjJlsgD1FH6K5ezWORw_W3oo2BuQWtb9jA7ts",
+      "sign_short": "pyq6",
+      "sign_fingerprint": "pYq6UA4fHWkKPj_Q9anN0rx4amb8mlEpc9G0fp0Gbvk",
+      "sign_keyid_hex": "a58aba500e1f1d69",
+      "sign_seed_hex": "6060613210a6c886152c3ab84d6e8bff883470faeff62f2ecef1eecdd72840d1",
+      "sign_jwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "7RVgvDNjJlsgD1FH6K5ezWORw_W3oo2BuQWtb9jA7ts",
+        "d": "YGBhMhCmyIYVLDq4TW6L_4g0cPrv9i8uzvHuzdcoQNE"
+      },
+      "announcement": "S2+PK.Bob.ofiz.Ai7HfEHjBIVvBv2Hm7U_gDtoGoK7EGm2Oy5Lh_rvWjkp.7RVgvDNjJlsgD1FH6K5ezWORw_W3oo2BuQWtb9jA7ts"
+    },
+    {
+      "id": "carol",
+      "label": "sigil-public-test-signet-carol-DO-NOT-USE",
+      "record": {
+        "kind": "signet",
+        "name": "Carol",
+        "short": "3vgy",
+        "pk": "AqVSJW3qa86_XHXm6Rs6l080IUzkszU2lzkoapk4qUGN",
+        "sk_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgun53Io+Mujpz+AlK\nlSpDrl8zvEViFy446wfswsok+guhRANCAASlUiVt6mvOv1x15ukbOpdPNCFM5LM1\nNpc5KGqZOKlBjZfGpAgl/CsEYIUqu/7pXLTU2C5h0eONkq9ek6eOkhO0\n-----END PRIVATE KEY-----\n",
+        "curve": "P-256",
+        "created": "2026-09-27T00:00:00Z",
+        "sign_alg": "Ed25519",
+        "sign_pk": "xLM_RQDWsvc53wfklrsgN8UDPnCBzsF97AzKPf20gZ4",
+        "sign_short": "jg3u",
+        "sign_sk_pem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIEbUgEhDe5j40meLFqp2XaCzejEMs37dF4xVFOg7yo2P\n-----END PRIVATE KEY-----\n"
+      },
+      "name": "Carol",
+      "short": "3vgy",
+      "pk": "AqVSJW3qa86_XHXm6Rs6l080IUzkszU2lzkoapk4qUGN",
+      "fingerprint": "3vGYWLnUF6n9y0BJoo9gsMwAATI5i7pZhqFBkL021rc",
+      "sk_hex": "ba7e77228f8cba3a73f8094a952a43ae5f33bc4562172e38eb07ecc2ca24fa0b",
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "pVIlbeprzr9cdebpGzqXTzQhTOSzNTaXOShqmTipQY0",
+        "y": "l8akCCX8KwRghSq7_ulctNTYLmHR442Sr16Tp46SE7Q",
+        "d": "un53Io-Mujpz-AlKlSpDrl8zvEViFy446wfswsok-gs"
+      },
+      "sign_pk": "xLM_RQDWsvc53wfklrsgN8UDPnCBzsF97AzKPf20gZ4",
+      "sign_short": "jg3u",
+      "sign_fingerprint": "jG3uXpqbXw4G6VxMCKeeRzzly6ygk72E0Gpo093FrGw",
+      "sign_keyid_hex": "8c6dee5e9a9b5f0e",
+      "sign_seed_hex": "46d48048437b98f8d2678b16aa765da0b37a310cb37edd178c5514e83bca8d8f",
+      "sign_jwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "xLM_RQDWsvc53wfklrsgN8UDPnCBzsF97AzKPf20gZ4",
+        "d": "RtSASEN7mPjSZ4sWqnZdoLN6MQyzft0XjFUU6DvKjY8"
+      },
+      "announcement": "S2+PK.Carol.3vgy.AqVSJW3qa86_XHXm6Rs6l080IUzkszU2lzkoapk4qUGN.xLM_RQDWsvc53wfklrsgN8UDPnCBzsF97AzKPf20gZ4"
+    },
+    {
+      "id": "mallory",
+      "label": "sigil-public-test-signet-mallory-DO-NOT-USE",
+      "record": {
+        "kind": "signet",
+        "name": "Mallory",
+        "short": "a46q",
+        "pk": "AowHfAWnQQeu8YsXBAtiEZfiaaP2lz4rsecKnKcXYKWU",
+        "sk_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg0cLmw15AOUzNREi7\n2CfmgGr8s6ADLRtqFeTUkMB8F02hRANCAASMB3wFp0EHrvGLFwQLYhGX4mmj9pc+\nK7HnCpynF2CllHBzPK8K9l3O5j602YP8T7KjqCXL6a8fiEPQutCu26AS\n-----END PRIVATE KEY-----\n",
+        "curve": "P-256",
+        "created": "2026-09-27T00:00:00Z",
+        "sign_alg": "Ed25519",
+        "sign_pk": "oa6QWNoNqmcMEyqJkUSRv4oJHCN3nBWxMv-Pip6kE8k",
+        "sign_short": "vccr",
+        "sign_sk_pem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIM81OmrOIj8tH+IWjhoHfL/tjwyv91jyd9x+mlJ5qzac\n-----END PRIVATE KEY-----\n"
+      },
+      "name": "Mallory",
+      "short": "a46q",
+      "pk": "AowHfAWnQQeu8YsXBAtiEZfiaaP2lz4rsecKnKcXYKWU",
+      "fingerprint": "a46QFTuhbZryzkeH2m4e8zgp6MHIePehFOucZwotaKI",
+      "sk_hex": "d1c2e6c35e40394ccd4448bbd827e6806afcb3a0032d1b6a15e4d490c07c174d",
+      "jwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "jAd8BadBB67xixcEC2IRl-Jpo_aXPiux5wqcpxdgpZQ",
+        "y": "cHM8rwr2Xc7mPrTZg_xPsqOoJcvprx-IQ9C60K7boBI",
+        "d": "0cLmw15AOUzNREi72CfmgGr8s6ADLRtqFeTUkMB8F00"
+      },
+      "sign_pk": "oa6QWNoNqmcMEyqJkUSRv4oJHCN3nBWxMv-Pip6kE8k",
+      "sign_short": "vccr",
+      "sign_fingerprint": "Vccra_ot0cVCRZE6hcwHbF_wtnxig5WbhKLZkgLBHCE",
+      "sign_keyid_hex": "55c72b6bfa2dd1c5",
+      "sign_seed_hex": "cf353a6ace223f2d1fe2168e1a077cbfed8f0caff758f277dc7e9a5279ab369c",
+      "sign_jwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "oa6QWNoNqmcMEyqJkUSRv4oJHCN3nBWxMv-Pip6kE8k",
+        "d": "zzU6as4iPy0f4haOGgd8v-2PDK_3WPJ33H6aUnmrNpw"
+      },
+      "announcement": "S2+PK.Mallory.a46q.AowHfAWnQQeu8YsXBAtiEZfiaaP2lz4rsecKnKcXYKWU.oa6QWNoNqmcMEyqJkUSRv4oJHCN3nBWxMv-Pip6kE8k"
+    }
+  ],
+  "directions": [
+    {
+      "from": "alice",
+      "to": "bob",
+      "ctx": "SIGIL.v2.K.n9fw.ofiz",
+      "ecdh_x_hex": "03cba43174471db36be4892ad1aec377e8c9768e538960c39add8540cd3de453",
+      "info_hex": "534947494c2e76322e4b2e6e3966772e6f66697a0227d8c50ea528467f084b5c73f87db580f94414d2d71344392f8310500f454d7f022ec77c41e304856f06fd879bb53f803b681a82bb1069b63b2e4b87faef5a3929",
+      "key_hex": "ef1ae3985735f777f42518df1ec17a821990ca37c231758fa9d45a1c1164b602"
+    },
+    {
+      "from": "bob",
+      "to": "alice",
+      "ctx": "SIGIL.v2.K.ofiz.n9fw",
+      "ecdh_x_hex": "03cba43174471db36be4892ad1aec377e8c9768e538960c39add8540cd3de453",
+      "info_hex": "534947494c2e76322e4b2e6f66697a2e6e396677022ec77c41e304856f06fd879bb53f803b681a82bb1069b63b2e4b87faef5a39290227d8c50ea528467f084b5c73f87db580f94414d2d71344392f8310500f454d7f",
+      "key_hex": "477f8a63e97c28af52d0fc3f0e14d916e6815d247cdd3f675bbaff3554fbeb29"
+    },
+    {
+      "from": "mallory",
+      "to": "bob",
+      "ctx": "SIGIL.v2.K.a46q.ofiz",
+      "ecdh_x_hex": "b14373adb0b6f66d959f246d717646b6e76545c8a1fd41070e029d324e8e156e",
+      "info_hex": "534947494c2e76322e4b2e613436712e6f66697a028c077c05a74107aef18b17040b621197e269a3f6973e2bb1e70a9ca71760a594022ec77c41e304856f06fd879bb53f803b681a82bb1069b63b2e4b87faef5a3929",
+      "key_hex": "17a251b4951aac8bdaf25983aad26fd5dca0afdd4a4262f3ced7f829e0fcb49c"
+    }
+  ],
+  "positive": [
+    {
+      "id": "plain-short",
+      "from": "alice",
+      "to": "bob",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "portal at 1847 12 -320",
+      "lines": [
+        "S2K.ofiz.n9fw.AH8Fo3Lyhs7tyy-BXh1q9-G1LZhPg0qu4phrkzLJf3_KmwAGjx99UecG86d5n_vFvyQJ"
+      ],
+      "parts": [
+        {
+          "token": "S2K.ofiz.n9fw.AH8Fo3Lyhs7tyy-BXh1q9-G1LZhPg0qu4phrkzLJf3_KmwAGjx99UecG86d5n_vFvyQJ",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "from": "Alice",
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "7f05a372f286ceedcb2f815e",
+          "aad_hex": "00534947494c2e76322e4b2e6e3966772e6f66697a",
+          "payload_hex": "706f7274616c2061742031383437203132202d333230",
+          "plaintext": "portal at 1847 12 -320"
+        }
+      ],
+      "joined": "portal at 1847 12 -320",
+      "joined_equals_plaintext": true,
+      "note": "Alice -> Bob, raw, one line."
+    },
+    {
+      "id": "reverse-direction",
+      "from": "bob",
+      "to": "alice",
+      "opener": {
+        "own": [
+          "alice"
+        ],
+        "contacts": [
+          "bob"
+        ]
+      },
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "portal at 1847 12 -320",
+      "lines": [
+        "S2K.n9fw.ofiz.ACaa4CUCVKWgLQQA3lhHF6zbDUYGfzd22Be-nTK0fDOnWegxhcq58kCyk0LYDZL3tY5u"
+      ],
+      "parts": [
+        {
+          "token": "S2K.n9fw.ofiz.ACaa4CUCVKWgLQQA3lhHF6zbDUYGfzd22Be-nTK0fDOnWegxhcq58kCyk0LYDZL3tY5u",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "from": "Bob",
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "269ae0250254a5a02d0400de",
+          "aad_hex": "00534947494c2e76322e4b2e6f66697a2e6e396677",
+          "payload_hex": "706f7274616c2061742031383437203132202d333230",
+          "plaintext": "portal at 1847 12 -320"
+        }
+      ],
+      "joined": "portal at 1847 12 -320",
+      "joined_equals_plaintext": true,
+      "note": "Bob -> Alice uses a different key (ctx and info order are directional)."
+    },
+    {
+      "id": "plain-empty",
+      "from": "alice",
+      "to": "bob",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "",
+      "lines": [
+        "S2K.ofiz.n9fw.AIl7zzDxgklv1cTvPY_gtzlxYD8IMa1CRPNLnuc"
+      ],
+      "parts": [
+        {
+          "token": "S2K.ofiz.n9fw.AIl7zzDxgklv1cTvPY_gtzlxYD8IMa1CRPNLnuc",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "from": "Alice",
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "897bcf30f182496fd5c4ef3d",
+          "aad_hex": "00534947494c2e76322e4b2e6e3966772e6f66697a",
+          "payload_hex": "",
+          "plaintext": ""
+        }
+      ],
+      "joined": "",
+      "joined_equals_plaintext": true,
+      "note": "Empty plaintext."
+    },
+    {
+      "id": "plain-single-line-max",
+      "from": "alice",
+      "to": "bob",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "lines": [
+        "S2K.ofiz.n9fw.AKrwzK0IbbNmYE14M9gU264DHGvg9LfsU4YWQQhkJsaEb2tbhuIP-KcDqgUjCjYDC9IufVEjYd1Q9lZUmF7VbKoRBbVEn-N88ECOwgBVo_Q6ZW-j3gtABy7-PAlJ5gVia6VY-dTWZYrWCSVVIAOAzYTZXxqzfr_9VaDmS9LpZwFbOEP38vtYB0-0hWj_BkpqdpIKmBmFkcp9DY2hIyXyBWqQ81hujZHCsxVlfeeTjP7hj2RdGA"
+      ],
+      "parts": [
+        {
+          "token": "S2K.ofiz.n9fw.AKrwzK0IbbNmYE14M9gU264DHGvg9LfsU4YWQQhkJsaEb2tbhuIP-KcDqgUjCjYDC9IufVEjYd1Q9lZUmF7VbKoRBbVEn-N88ECOwgBVo_Q6ZW-j3gtABy7-PAlJ5gVia6VY-dTWZYrWCSVVIAOAzYTZXxqzfr_9VaDmS9LpZwFbOEP38vtYB0-0hWj_BkpqdpIKmBmFkcp9DY2hIyXyBWqQ81hujZHCsxVlfeeTjP7hj2RdGA",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "from": "Alice",
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "aaf0ccad086db366604d7833",
+          "aad_hex": "00534947494c2e76322e4b2e6e3966772e6f66697a",
+          "payload_hex": "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+          "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "joined": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "joined_equals_plaintext": true,
+      "note": "Longest ASCII run (152 B) in one S2K line at max_line=256."
+    },
+    {
+      "id": "plain-first-split",
+      "from": "alice",
+      "to": "bob",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "lines": [
+        "S2K.ofiz.n9fw.BAH5ucnYZKBpFNLnMLy3U6WOgxb3bqPyth7ouLyGi11Cy3yObOfYGj2Zi8OBzZyDm6iT_xa-Yls-JVXwCxGiOKEh9ujeXxJ6OGwSrZc4Yb9mIQ2ZwstrV9xABGBEZ8IIxkDiAvy3RKphPrYo2eC4yB8cmYB6442RaMvXXrM1CWHrWcRlz_9VL3XEr-T5S6-WIVtBw1b3zRwwHKkUjlgFqxg8Ce4tmbMpbgvCzD9JPufwsh6fJg",
+        "S2K.ofiz.n9fw.BBH5ucnYZKAykGaRZZYrqEuFh6t-vUsP4cKsRUezP3e-PRhZb0LccliWny4"
+      ],
+      "parts": [
+        {
+          "token": "S2K.ofiz.n9fw.BAH5ucnYZKBpFNLnMLy3U6WOgxb3bqPyth7ouLyGi11Cy3yObOfYGj2Zi8OBzZyDm6iT_xa-Yls-JVXwCxGiOKEh9ujeXxJ6OGwSrZc4Yb9mIQ2ZwstrV9xABGBEZ8IIxkDiAvy3RKphPrYo2eC4yB8cmYB6442RaMvXXrM1CWHrWcRlz_9VL3XEr-T5S6-WIVtBw1b3zRwwHKkUjlgFqxg8Ce4tmbMpbgvCzD9JPufwsh6fJg",
+          "index": 1,
+          "total": 2,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "from": "Alice",
+          "header_hex": "0401f9b9c9d864a0",
+          "mid_hex": "f9b9c9d864a0",
+          "nonce_hex": "6914d2e730bcb753a58e8316",
+          "aad_hex": "0401f9b9c9d864a0534947494c2e76322e4b2e6e3966772e6f66697a",
+          "payload_hex": "61616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+          "plaintext": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "token": "S2K.ofiz.n9fw.BBH5ucnYZKAykGaRZZYrqEuFh6t-vUsP4cKsRUezP3e-PRhZb0LccliWny4",
+          "index": 2,
+          "total": 2,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "from": "Alice",
+          "header_hex": "0411f9b9c9d864a0",
+          "mid_hex": "f9b9c9d864a0",
+          "nonce_hex": "3290669165962ba84b8587ab",
+          "aad_hex": "0411f9b9c9d864a0534947494c2e76322e4b2e6e3966772e6f66697a",
+          "payload_hex": "6161616161616161",
+          "plaintext": "aaaaaaaa"
+        }
+      ],
+      "joined": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "joined_equals_plaintext": true,
+      "note": "One byte more: two parts with part byte + message id."
+    },
+    {
+      "id": "whisper-budget",
+      "from": "alice",
+      "to": "bob",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "seal": {
+        "compact": false,
+        "max_line": 234,
+        "sender": ""
+      },
+      "plaintext": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "lines": [
+        "S2K.ofiz.n9fw.AOPLVnxquGq8eGi2IeH-uriPIHSrTaTwFSGI1tEwXpj7qAbEs03a0npCBdl1H5fBTq2FcUYToeyYfNMFoOkz0tOEkODwglLYrGb6yUyPfOl5tC5LVkjJIgMF30tquYXo36aqMjQjBNXtLrY7FM-MYMN2nKxnv6iwzd4_WxptbXDZddwkiLCSGvHDDWjv66p0AITRJRmGcGlsVzjH6TwqPDiQl8WG"
+      ],
+      "parts": [
+        {
+          "token": "S2K.ofiz.n9fw.AOPLVnxquGq8eGi2IeH-uriPIHSrTaTwFSGI1tEwXpj7qAbEs03a0npCBdl1H5fBTq2FcUYToeyYfNMFoOkz0tOEkODwglLYrGb6yUyPfOl5tC5LVkjJIgMF30tquYXo36aqMjQjBNXtLrY7FM-MYMN2nKxnv6iwzd4_WxptbXDZddwkiLCSGvHDDWjv66p0AITRJRmGcGlsVzjH6TwqPDiQl8WG",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "from": "Alice",
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "e3cb567c6ab86abc7868b621",
+          "aad_hex": "00534947494c2e76322e4b2e6e3966772e6f66697a",
+          "payload_hex": "62626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262",
+          "plaintext": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "joined": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "joined_equals_plaintext": true,
+      "note": "136 B = one S2K line in a /msg whisper budget (max_line=234)."
+    },
+    {
+      "id": "plain-multipart-3",
+      "from": "alice",
+      "to": "bob",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij",
+      "lines": [
+        "S2K.ofiz.n9fw.BALOgKrzIJHb5mScWD-tpguwyz2ii-sOgfYNgljlksTxe-BNjsOw0VnGCRza0Ktnpsv9hbA2a41oxS4G21M7XIUexiig7Me7bwNbuwY7R5G3wQWsAu_XWHK2kD0ZPeKMrWczJhAbo9ZhODp5vcviGjh7HERhBGpNctfzBrN9yYrUcm0yrzExf8JHEqZujXMYqq6zi3ccxIKMUuDIVLkuV0RkNMxAa-zITCD4P6KCMv9_yg84ww",
+        "S2K.ofiz.n9fw.BBLOgKrzIJEggyR45zMGP8RXDQ8i7Nz2SwgJp5xxCrate7b_CEMQzoUQ7fQaoaPEdsS_hgjiOHmbWMjITt02WjuOvbEb5gSkZqI_zmNxIW9LpNQThFojzmMkKgL_WZxeIS4MdH2SRQ6rEKzrWipy_j-fFJxeqDdzh4MfHGmFLoUIa1hY3rKB9ofPfGD7p_lVxmhOm_OFBc53QHgWeUkq_NwA5IVHsfW8ZBgx8-_MsB106LBMBQ",
+        "S2K.ofiz.n9fw.BCLOgKrzIJFaDQZmkBWZVMTikB6kTN5sAl66SU1zxe_gftD0mKuYk7_2MR8OXjuq27gZgBQlwHV22EJX8IhhUcrDPT7Ucj5Ojy7HGI2-3kJNea83mZj3j0TiBp7c4cQ7lI2_t6dRLBGKQ7Vq5LryGdYN7Zishh8oL09nkzhGrWQFm2X-FhDZ29nKZgZ3TecUiHw"
+      ],
+      "parts": [
+        {
+          "token": "S2K.ofiz.n9fw.BALOgKrzIJHb5mScWD-tpguwyz2ii-sOgfYNgljlksTxe-BNjsOw0VnGCRza0Ktnpsv9hbA2a41oxS4G21M7XIUexiig7Me7bwNbuwY7R5G3wQWsAu_XWHK2kD0ZPeKMrWczJhAbo9ZhODp5vcviGjh7HERhBGpNctfzBrN9yYrUcm0yrzExf8JHEqZujXMYqq6zi3ccxIKMUuDIVLkuV0RkNMxAa-zITCD4P6KCMv9_yg84ww",
+          "index": 1,
+          "total": 3,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "from": "Alice",
+          "header_hex": "0402ce80aaf32091",
+          "mid_hex": "ce80aaf32091",
+          "nonce_hex": "dbe6649c583fada60bb0cb3d",
+          "aad_hex": "0402ce80aaf32091534947494c2e76322e4b2e6e3966772e6f66697a",
+          "payload_hex": "6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465",
+          "plaintext": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcde"
+        },
+        {
+          "token": "S2K.ofiz.n9fw.BBLOgKrzIJEggyR45zMGP8RXDQ8i7Nz2SwgJp5xxCrate7b_CEMQzoUQ7fQaoaPEdsS_hgjiOHmbWMjITt02WjuOvbEb5gSkZqI_zmNxIW9LpNQThFojzmMkKgL_WZxeIS4MdH2SRQ6rEKzrWipy_j-fFJxeqDdzh4MfHGmFLoUIa1hY3rKB9ofPfGD7p_lVxmhOm_OFBc53QHgWeUkq_NwA5IVHsfW8ZBgx8-_MsB106LBMBQ",
+          "index": 2,
+          "total": 3,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "from": "Alice",
+          "header_hex": "0412ce80aaf32091",
+          "mid_hex": "ce80aaf32091",
+          "nonce_hex": "20832478e733063fc4570d0f",
+          "aad_hex": "0412ce80aaf32091534947494c2e76322e4b2e6e3966772e6f66697a",
+          "payload_hex": "666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a",
+          "plaintext": "fghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij"
+        },
+        {
+          "token": "S2K.ofiz.n9fw.BCLOgKrzIJFaDQZmkBWZVMTikB6kTN5sAl66SU1zxe_gftD0mKuYk7_2MR8OXjuq27gZgBQlwHV22EJX8IhhUcrDPT7Ucj5Ojy7HGI2-3kJNea83mZj3j0TiBp7c4cQ7lI2_t6dRLBGKQ7Vq5LryGdYN7Zishh8oL09nkzhGrWQFm2X-FhDZ29nKZgZ3TecUiHw",
+          "index": 3,
+          "total": 3,
+          "flags": 4,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "from": "Alice",
+          "header_hex": "0422ce80aaf32091",
+          "mid_hex": "ce80aaf32091",
+          "nonce_hex": "5a0d066690159954c4e2901e",
+          "aad_hex": "0422ce80aaf32091534947494c2e76322e4b2e6e3966772e6f66697a",
+          "payload_hex": "6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a",
+          "plaintext": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij"
+        }
+      ],
+      "joined": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij",
+      "joined_equals_plaintext": true,
+      "note": "Three raw parts."
+    },
+    {
+      "id": "unicode-mixed",
+      "from": "alice",
+      "to": "bob",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "Grüße 🧭 北 -320 / ñ / שלום / é",
+      "lines": [
+        "S2K.ofiz.n9fw.APumDl4Cb_8EePmIOva32ZieIQj4XWlEtOmmd2uGH7SIoTWolWbqYEV81eFYObN2QykVtoOn5jT_tCM9RHDXQQPIedPKWNyJ"
+      ],
+      "parts": [
+        {
+          "token": "S2K.ofiz.n9fw.APumDl4Cb_8EePmIOva32ZieIQj4XWlEtOmmd2uGH7SIoTWolWbqYEV81eFYObN2QykVtoOn5jT_tCM9RHDXQQPIedPKWNyJ",
+          "index": 1,
+          "total": 1,
+          "flags": 0,
+          "codebook": false,
+          "join": false,
+          "sender": null,
+          "from": "Alice",
+          "header_hex": "00",
+          "mid_hex": "",
+          "nonce_hex": "fba60e5e026fff0478f9883a",
+          "aad_hex": "00534947494c2e76322e4b2e6e3966772e6f66697a",
+          "payload_hex": "4772c3bcc39f6520f09fa7ad20e58c97202d333230202f20c3b1202f20d7a9d79cd795d79d202f2065cc81",
+          "plaintext": "Grüße 🧭 北 -320 / ñ / שלום / é"
+        }
+      ],
+      "joined": "Grüße 🧭 北 -320 / ñ / שלום / é",
+      "joined_equals_plaintext": true,
+      "note": "Multi-byte UTF-8."
+    },
+    {
+      "id": "compact-z",
+      "from": "alice",
+      "to": "bob",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "seal": {
+        "compact": true,
+        "max_line": 256,
+        "sender": ""
+      },
+      "plaintext": "nether roof stash at 0 128 0",
+      "lines": [
+        "S2K.ofiz.n9fw.AfV4ex0U2cW4kzwpk7XWJ7lRduby3NmynkhEszCsKeORObJWqmc"
+      ],
+      "parts": [
+        {
+          "token": "S2K.ofiz.n9fw.AfV4ex0U2cW4kzwpk7XWJ7lRduby3NmynkhEszCsKeORObJWqmc",
+          "index": 1,
+          "total": 1,
+          "flags": 1,
+          "codebook": true,
+          "join": false,
+          "sender": null,
+          "from": "Alice",
+          "header_hex": "01",
+          "mid_hex": "",
+          "nonce_hex": "f5787b1d14d9c5b8933c2993",
+          "aad_hex": "01534947494c2e76322e4b2e6e3966772e6f66697a",
+          "payload_hex": "c200100604440181c0",
+          "plaintext": "nether roof stash at 0 128 0"
+        }
+      ],
+      "joined": "nether roof stash at 0 128 0",
+      "joined_equals_plaintext": true,
+      "note": "Codebook v2 body."
+    },
+    {
+      "id": "sender-field",
+      "from": "alice",
+      "to": "bob",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": "Alice"
+      },
+      "plaintext": "who sent this",
+      "lines": [
+        "S2K.ofiz.n9fw.CBP3pSlz64Srm3oPqyPwezq_h2kfCAUbCkQNgS0PpwF5KDjLgdR6JWF7UI2x0an4"
+      ],
+      "parts": [
+        {
+          "token": "S2K.ofiz.n9fw.CBP3pSlz64Srm3oPqyPwezq_h2kfCAUbCkQNgS0PpwF5KDjLgdR6JWF7UI2x0an4",
+          "index": 1,
+          "total": 1,
+          "flags": 8,
+          "codebook": false,
+          "join": false,
+          "sender": "Alice",
+          "from": "Alice",
+          "header_hex": "08",
+          "mid_hex": "",
+          "nonce_hex": "13f7a52973eb84ab9b7a0fab",
+          "aad_hex": "08534947494c2e76322e4b2e6e3966772e6f66697a",
+          "payload_hex": "05416c69636577686f2073656e742074686973",
+          "plaintext": "who sent this"
+        }
+      ],
+      "joined": "who sent this",
+      "joined_equals_plaintext": true,
+      "note": "Sealed sender name. The authenticated identity is the route's from key (Alice), not this field."
+    },
+    {
+      "id": "sender-claim-not-identity",
+      "from": "mallory",
+      "to": "bob",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice",
+          "mallory"
+        ]
+      },
+      "seal": {
+        "compact": false,
+        "max_line": 256,
+        "sender": "Alice"
+      },
+      "plaintext": "I am Alice",
+      "lines": [
+        "S2K.ofiz.a46q.CKQ4NxqVAVUjg94pqPIC3FJcgZGMym448XRNNE2zFFl0AK4KgpsbHhJQ1QST"
+      ],
+      "parts": [
+        {
+          "token": "S2K.ofiz.a46q.CKQ4NxqVAVUjg94pqPIC3FJcgZGMym448XRNNE2zFFl0AK4KgpsbHhJQ1QST",
+          "index": 1,
+          "total": 1,
+          "flags": 8,
+          "codebook": false,
+          "join": false,
+          "sender": "Alice",
+          "from": "Mallory",
+          "header_hex": "08",
+          "mid_hex": "",
+          "nonce_hex": "a438371a9501552383de29a8",
+          "aad_hex": "08534947494c2e76322e4b2e613436712e6f66697a",
+          "payload_hex": "05416c6963654920616d20416c696365",
+          "plaintext": "I am Alice"
+        }
+      ],
+      "joined": "I am Alice",
+      "joined_equals_plaintext": true,
+      "note": "Mallory (a known contact) claims sender 'Alice'. It opens, but 'from' is Mallory: only the key proves the sender."
+    }
+  ],
+  "negative": [
+    {
+      "id": "tampered-tag",
+      "line": "S2K.ofiz.n9fw.AH8Fo3Lyhs7tyy-BXh1q9-G1LZhPg0qu4phrkzLJf3_KmwAGjx99UecG86d5n_vFvyQI",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "reason": "Last tag byte flipped."
+    },
+    {
+      "id": "tampered-header",
+      "line": "S2K.ofiz.n9fw.CH8Fo3Lyhs7tyy-BXh1q9-G1LZhPg0qu4phrkzLJf3_KmwAGjx99UecG86d5n_vFvyQJ",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "reason": "S flag set: header is in the AAD."
+    },
+    {
+      "id": "impersonation-route-relabelled",
+      "line": "S2K.ofiz.n9fw.APgFFRITYOk2REeh3LDIBBiJ-tNRfd8jGIjYk173eDv7RF3UVB5DmO8YMR1ZnGRQGQ",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "reason": "Mallory seals with her own key and writes Alice's short id as sender. Bob derives the key from Alice's public key, so the tag fails."
+    },
+    {
+      "id": "impersonation-unknown-sender",
+      "line": "S2K.ofiz.a46q.APgFFRITYOk2REeh3LDIBBiJ-tNRfd8jGIjYk173eDv7RF3UVB5DmO8YMR1ZnGRQGQ",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "reason": "Mallory's own honest token: Bob has no contact with her short id."
+    },
+    {
+      "id": "reflection",
+      "line": "S2K.n9fw.ofiz.AH8Fo3Lyhs7tyy-BXh1q9-G1LZhPg0qu4phrkzLJf3_KmwAGjx99UecG86d5n_vFvyQJ",
+      "opener": {
+        "own": [
+          "alice"
+        ],
+        "contacts": [
+          "bob"
+        ]
+      },
+      "reason": "Alice->Bob token reflected back to Alice as if Bob sent it: the direction key differs."
+    },
+    {
+      "id": "wrong-recipient",
+      "line": "S2K.ofiz.n9fw.AOsQHuHk9imaODhrhn2wMdkAQInF2_6jFuPxSOm54gJiL2UcQggYWan1tA",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "reason": "Alice->Carol token relabelled to Bob."
+    },
+    {
+      "id": "not-for-me",
+      "line": "S2K.3vgy.n9fw.AOsQHuHk9imaODhrhn2wMdkAQInF2_6jFuPxSOm54gJiL2UcQggYWan1tA",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "reason": "Addressed to Carol's short id; Bob holds no such signet."
+    },
+    {
+      "id": "fragment-relabelled",
+      "line": "S2K.ofiz.n9fw.BBLOgKrzIJHb5mScWD-tpguwyz2ii-sOgfYNgljlksTxe-BNjsOw0VnGCRza0Ktnpsv9hbA2a41oxS4G21M7XIUexiig7Me7bwNbuwY7R5G3wQWsAu_XWHK2kD0ZPeKMrWczJhAbo9ZhODp5vcviGjh7HERhBGpNctfzBrN9yYrUcm0yrzExf8JHEqZujXMYqq6zi3ccxIKMUuDIVLkuV0RkNMxAa-zITCD4P6KCMv9_yg84ww",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "reason": "Part 1/3 relabelled 2/3."
+    },
+    {
+      "id": "truncated",
+      "line": "S2K.ofiz.n9fw.AAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "opener": {
+        "own": [
+          "bob"
+        ],
+        "contacts": [
+          "alice"
+        ]
+      },
+      "reason": "Frame shorter than header + nonce + tag."
+    }
+  ]
+}
